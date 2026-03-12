@@ -25,6 +25,7 @@ export default function ProfessorPortal({ session, onLogout }) {
     const [loading, setLoading] = useState(true)
     const [messages, setMessages] = useState([])
     const [query, setQuery] = useState('')
+    const [showAbout, setShowAbout] = useState(false)
     
     // Onboarding para novos professores
     const [showOnboarding, setShowOnboarding] = useState(false)
@@ -426,13 +427,20 @@ export default function ProfessorPortal({ session, onLogout }) {
                                 <p className="text-[10px] opacity-50 font-medium">Valide se o Professor Virtual aprendeu o conteúdo corretamente</p>
                             </div>
                         </div>
-                        <button 
-                            onClick={() => setMessages([])}
-                            className="p-2 hover:bg-red-500/10 text-red-400 rounded-xl transition-colors"
-                            title="Limpar Chat"
-                        >
-                            <Trash2 size={18} />
-                        </button>
+                            <button 
+                                onClick={onLogout}
+                                className="p-3 rounded-2xl bg-white/5 text-white/40 hover:text-red-400 hover:bg-red-400/10 transition-all border border-white/5"
+                                title="Sair"
+                            >
+                                <LogOut size={20} />
+                            </button>
+                            <button 
+                                onClick={() => setShowAbout(true)}
+                                className="p-3 rounded-2xl bg-estuda-primary text-white hover:scale-105 active:scale-95 transition-all shadow-lg"
+                                title="Sobre o Criador"
+                            >
+                                <Sparkles size={20} />
+                            </button>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-estuda-bg/10">
@@ -491,6 +499,51 @@ export default function ProfessorPortal({ session, onLogout }) {
                     </div>
                 </div>
             </div>
+
+            {/* Modal Sobre o Criador */}
+            {showAbout && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6 pointer-events-auto">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowAbout(false)} />
+                    <div className="bg-estuda-surface border border-estuda-primary/20 w-full max-w-sm rounded-[3rem] p-8 flex flex-col items-center relative z-20 animate-scale-up shadow-[0_0_50px_rgba(74,144,226,0.15)]">
+                        <div className="relative mb-6">
+                            <div className="absolute inset-0 bg-estuda-primary blur-2xl opacity-20 rounded-full" />
+                            <img 
+                                src="https://www.gravatar.com/avatar/240cf86f87d7b1a646c1097e3a9856ad?s=400&d=mp" 
+                                alt="Arlei Silvério" 
+                                className="size-32 rounded-[2.5rem] border-4 border-estuda-surface object-cover relative z-10 shadow-2xl shadow-black/50"
+                            />
+                        </div>
+                        
+                        <h3 className="text-2xl font-black text-white text-center">Arlei Silvério</h3>
+                        <p className="text-estuda-primary font-black text-[10px] uppercase tracking-[0.3em] mt-1">Idealizador & Desenvolvedor</p>
+                        
+                        <div className="w-full h-px bg-white/5 my-6" />
+                        
+                        <div className="flex flex-col gap-4 w-full">
+                            <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
+                                <div className="size-10 rounded-xl bg-estuda-primary/10 flex items-center justify-center text-estuda-primary">
+                                    <FileText size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40">E-mail</p>
+                                    <p className="text-sm font-bold text-white">arlei85@hotmail.com</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <p className="text-center text-[11px] leading-relaxed text-white/40 font-medium mt-8">
+                            "Focado em transformar a educação através da tecnologia e inteligência artificial."
+                        </p>
+
+                        <button 
+                            onClick={() => setShowAbout(false)}
+                            className="mt-10 w-full py-4 rounded-2xl bg-white/5 border border-white/10 font-black text-xs uppercase tracking-widest hover:bg-white/10 transition-colors"
+                        >
+                            Fechar
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

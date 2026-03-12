@@ -95,6 +95,7 @@ function App() {
     const [showCarouselManager, setShowCarouselManager] = useState(false)
     const [newSlideUrl, setNewSlideUrl] = useState('')
     const [newSlideCaption, setNewSlideCaption] = useState('')
+    const [showAbout, setShowAbout] = useState(false)
 
     // Estado das Matérias
     const [subjects, setSubjects] = useState([])
@@ -1411,6 +1412,12 @@ function App() {
                                     >
                                         <Settings size={14} /> {perfil.nome ? 'Editar Perfil' : 'Configurar Perfil'}
                                     </button>
+                                    <button
+                                        onClick={() => setShowAbout(true)}
+                                        className="flex items-center gap-2 bg-white/5 text-white/60 px-5 py-2 rounded-2xl font-black text-xs hover:bg-white/10 hover:text-white transition-all border border-white/5"
+                                    >
+                                        <Sparkles size={14} /> Sobre o Criador
+                                    </button>
                                 </div>
 
                                 {/* Dados */}
@@ -2064,8 +2071,62 @@ function App() {
                     </div>
                 </div>
             )}
-        </div >
 
+            {/* Modal Sobre o Criador */}
+            {showAbout && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6 pointer-events-auto">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowAbout(false)} />
+                    <div className="bg-estuda-surface border border-estuda-primary/20 w-full max-w-sm rounded-[3rem] p-8 flex flex-col items-center relative z-20 animate-scale-up shadow-[0_0_50px_rgba(74,144,226,0.15)]">
+                        <div className="relative mb-6">
+                            <div className="absolute inset-0 bg-estuda-primary blur-2xl opacity-20 rounded-full" />
+                            <img 
+                                src="https://www.gravatar.com/avatar/240cf86f87d7b1a646c1097e3a9856ad?s=400&d=mp" 
+                                alt="Arlei Silvério" 
+                                className="size-32 rounded-[2.5rem] border-4 border-estuda-surface object-cover relative z-10 shadow-2xl shadow-black/50"
+                            />
+                        </div>
+                        
+                        <h3 className="text-2xl font-black text-white text-center">Arlei Silvério</h3>
+                        <p className="text-estuda-primary font-black text-[10px] uppercase tracking-[0.3em] mt-1">Idealizador & Desenvolvedor</p>
+                        
+                        <div className="w-full h-px bg-white/5 my-6" />
+                        
+                        <div className="flex flex-col gap-4 w-full">
+                            <a href="mailto:arlei85@hotmail.com" className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5 hover:border-estuda-primary/30 hover:bg-white/10 transition-all group">
+                                <div className="size-10 rounded-xl bg-estuda-primary/10 flex items-center justify-center text-estuda-primary group-hover:scale-110 transition-transform">
+                                    <Mail size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40">E-mail</p>
+                                    <p className="text-sm font-bold text-white">arlei85@hotmail.com</p>
+                                </div>
+                            </a>
+                        </div>
+                        
+                        <p className="text-center text-[11px] leading-relaxed text-white/40 font-medium mt-8">
+                            "Focado em transformar a educação através da tecnologia e inteligência artificial."
+                        </p>
+
+                        <button 
+                            onClick={() => setShowAbout(false)}
+                            className="mt-10 w-full py-4 rounded-2xl bg-white/5 border border-white/10 font-black text-xs uppercase tracking-widest hover:bg-white/10 transition-colors"
+                        >
+                            Fechar
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <style>{`
+                @keyframes scale-up {
+                    from { opacity: 0; transform: scale(0.95); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+                .animate-scale-up {
+                    animation: scale-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+                }
+            `}</style>
+        </div>
     )
 }
 

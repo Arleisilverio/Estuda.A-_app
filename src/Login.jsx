@@ -21,10 +21,19 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+    const [acceptedTerms, setAcceptedTerms] = useState(false)
+    const [showTerms, setShowTerms] = useState(false)
+    const [showPrivacy, setShowPrivacy] = useState(false)
 
     const handleSubmit = async (e) => {
         e.preventDefault()
         setError('')
+        
+        if (mode === 'register' && !acceptedTerms) {
+            setError('Você precisa aceitar os termos de uso para continuar.')
+            return
+        }
+
         setLoading(true)
 
         try {
@@ -138,6 +147,27 @@ export default function Login() {
                             </div>
                         </div>
 
+                        {/* Termos de Uso - Apenas no Cadastro */}
+                        {mode === 'register' && (
+                            <div className="flex items-start gap-3 px-1 mt-1">
+                                <div className="pt-0.5">
+                                    <input
+                                        type="checkbox"
+                                        id="terms"
+                                        checked={acceptedTerms}
+                                        onChange={e => setAcceptedTerms(e.target.checked)}
+                                        className="size-4 rounded-lg bg-estuda-bg border-estuda-primary/20 text-estuda-primary focus:ring-estuda-primary/30 cursor-pointer"
+                                    />
+                                </div>
+                                <label htmlFor="terms" className="text-[10px] sm:text-xs leading-relaxed text-white/50 font-medium cursor-pointer select-none">
+                                    Li e concordo com os{' '}
+                                    <button type="button" onClick={() => setShowTerms(true)} className="text-estuda-primary font-black hover:underline">Termos de Uso</button>
+                                    {' '}e as{' '}
+                                    <button type="button" onClick={() => setShowPrivacy(true)} className="text-estuda-primary font-black hover:underline">Políticas de Privacidade</button>.
+                                </label>
+                            </div>
+                        )}
+
                         {/* Erro */}
                         {error && (
                             <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-xs font-bold text-red-400 animate-fade-in">
@@ -172,6 +202,43 @@ export default function Login() {
                     Estuda Aí © 2026 · Todos os direitos reservados
                 </p>
             </div>
+
+            {/* Modal Termos de Uso (Placeholder) */}
+            {(showTerms || showPrivacy) && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-10 pointer-events-auto">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => { setShowTerms(false); setShowPrivacy(false) }} />
+                    <div className="bg-estuda-surface border border-white/10 w-full max-w-2xl max-h-[80vh] rounded-[2.5rem] p-8 sm:p-10 flex flex-col relative z-20 animate-scale-up overflow-hidden shadow-2xl">
+                        <div className="overflow-y-auto pr-4 custom-scrollbar">
+                            <h2 className="text-2xl font-black text-white mb-6">
+                                {showTerms ? 'Termos de Uso' : 'Políticas de Privacidade'}
+                            </h2>
+                            <div className="text-sm leading-relaxed text-white/60 space-y-4 font-medium">
+                                {showTerms ? (
+                                    <>
+                                        <p>Seja bem-vindo ao Estuda Aí. Ao utilizar nossa plataforma, você concorda em cumprir e estar vinculado aos seguintes termos:</p>
+                                        <p><strong>1. Uso da Plataforma:</strong> O Estuda Aí é uma ferramenta de apoio ao estudo. O uso indevido para trapaças ou plágio é de inteira responsabilidade do usuário.</p>
+                                        <p><strong>2. Conteúdo de IA:</strong> As respostas são geradas por Inteligência Artificial e devem ser verificadas pelo usuário. Não garantimos precisão absoluta.</p>
+                                        <p><strong>3. Responsabilidade do Professor:</strong> Professores são responsáveis pelo material didático que disponibilizam.</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p>Sua privacidade é importante para nós. Esta política descreve como tratamos seus dados:</p>
+                                        <p><strong>1. Coleta de Dados:</strong> Coletamos e-mail e nome para autenticação e personalização da experiência.</p>
+                                        <p><strong>2. Arquivos Enviados:</strong> Os materiais de estudo são processados para gerar conhecimento para a IA e não são compartilhados com terceiros.</p>
+                                        <p><strong>3. Segurança:</strong> Utilizamos infraestrutura segura do Supabase (PostgreSQL) para proteger suas informações.</p>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => { setShowTerms(false); setShowPrivacy(false) }}
+                            className="mt-8 w-full py-4 rounded-2xl bg-white/5 border border-white/10 font-black text-xs uppercase tracking-widest hover:bg-white/10 transition-colors"
+                        >
+                            Fechar
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
