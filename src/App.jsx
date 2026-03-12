@@ -27,7 +27,8 @@ import {
     Loader2,
     Sparkles,
     Quote,
-    Users
+    Users,
+    Mail
 } from 'lucide-react'
 
 // Imagens para o carrossel

@@ -14,7 +14,8 @@ import {
     Trash2,
     User,
     Camera,
-    Book
+    Book,
+    Mail
 } from 'lucide-react'
 
 export default function ProfessorPortal({ session, onLogout }) {
@@ -520,15 +521,15 @@ export default function ProfessorPortal({ session, onLogout }) {
                         <div className="w-full h-px bg-white/5 my-6" />
                         
                         <div className="flex flex-col gap-4 w-full">
-                            <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
-                                <div className="size-10 rounded-xl bg-estuda-primary/10 flex items-center justify-center text-estuda-primary">
-                                    <FileText size={20} />
+                            <a href="mailto:arlei85@hotmail.com" className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5 hover:border-estuda-primary/30 hover:bg-white/10 transition-all group">
+                                <div className="size-10 rounded-xl bg-estuda-primary/10 flex items-center justify-center text-estuda-primary group-hover:scale-110 transition-transform">
+                                    <Mail size={20} />
                                 </div>
                                 <div>
                                     <p className="text-[10px] font-black uppercase tracking-widest opacity-40">E-mail</p>
                                     <p className="text-sm font-bold text-white">arlei85@hotmail.com</p>
                                 </div>
-                            </div>
+                            </a>
                         </div>
                         
                         <p className="text-center text-[11px] leading-relaxed text-white/40 font-medium mt-8">
