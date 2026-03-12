@@ -68,6 +68,7 @@ function App() {
     // Admin check — based on database role
     const isAdmin = userRole === 'admin'
     const isProfessor = userRole === 'professor' || userRole === 'admin'
+    const isSuperAdmin = session?.user?.email === 'arlei85@hotmail.com'
 
     // Estado de Provas
     const [exams, setExams] = useState([])
@@ -122,6 +123,62 @@ function App() {
     const [authEmails, setAuthEmails] = useState([])
     const [newAuthEmail, setNewAuthEmail] = useState('')
     const [isManagingProfs, setIsManagingProfs] = useState(false)
+    const [isManagingUsers, setIsManagingUsers] = useState(false)
+    const [usersList, setUsersList] = useState([])
+
+    const fetchUsersList = async () => {
+        setLoading(true)
+        try {
+            const { data, error } = await supabase.functions.invoke('user-management', {
+                body: { action: 'list' }
+            })
+            if (error) throw error
+            if (data.users) setUsersList(data.users)
+        } catch (err) {
+            console.error('Erro ao buscar lista de usuários:', err)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const deleteUser = async (targetUserId, targetEmail) => {
+        if (!window.confirm(`AVISO IRREVERSÍVEL!\n\nTem certeza que deseja apagar permanentemente a conta de "${targetEmail}"?\n\nIsso apagará todos os documentos, quizzes, histórico e dados desta conta em efeito cascata. Esta ação não pode ser desfeita.`)) return
+        
+        setLoading(true)
+        try {
+            const { error } = await supabase.functions.invoke('user-management', {
+                body: { action: 'delete', userId: targetUserId }
+            })
+            if (error) throw error
+            alert('Usuário excluído com sucesso.')
+            fetchUsersList()
+        } catch (err) {
+            console.error('Erro ao excluir usuário:', err)
+            alert('Erro ao excluir usuário: ' + err.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const deleteOwnAccount = async () => {
+        if (!window.confirm('⚠️ AVISO MÁXIMO ⚠️\n\nVocê tem certeza absoluta? Esta ação apagará permanentemente sua conta e TODOS os seus arquivos, quizzes e notas definitivamente.\n\nA exclusão é irreversível.')) return
+        
+        setLoading(true)
+        try {
+            const { error } = await supabase.functions.invoke('user-management', {
+                body: { action: 'delete' }
+            })
+            if (error) throw error
+            alert('Sua conta e todos os dados foram removidos com sucesso.')
+            await supabase.auth.signOut()
+        } catch (err) {
+            console.error('Erro ao excluir própria conta:', err)
+            alert('Erro ao excluir conta: ' + err.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const fetchAuthEmails = async () => {
         const { data, error } = await supabase
             .from('authorized_professor_emails')
@@ -158,7 +215,10 @@ function App() {
         if (isAdmin && activeTab === 'perfil') {
             fetchAuthEmails()
         }
-    }, [isAdmin, activeTab])
+        if (isSuperAdmin && activeTab === 'perfil') {
+            fetchUsersList()
+        }
+    }, [isAdmin, isSuperAdmin, activeTab])
 
     const handleAvatarChange = (e) => {
         const file = e.target.files[0]
@@ -1463,6 +1523,17 @@ function App() {
                             </div>
                         </div>
 
+                        {/* Botão Excluir Conta (Auto-exclusão) */}
+                        <div className="px-4">
+                            <button 
+                                onClick={deleteOwnAccount}
+                                className="w-full flex items-center justify-center gap-3 p-4 rounded-3xl border border-red-500/20 bg-red-500/5 text-red-500 font-black text-xs uppercase tracking-widest hover:bg-red-500/10 transition-all active:scale-[0.98]"
+                            >
+                                <Trash2 size={16} /> Excluir Minha Conta
+                            </button>
+                            <p className="text-[9px] text-center text-white/20 mt-3 font-bold uppercase tracking-tighter">Atenção: A exclusão é imediata e irreversível.</p>
+                        </div>
+
                         {/* Histórico de Quizzes */}
                         <div className="bg-estuda-surface p-6 sm:p-8 rounded-[2.5rem] border border-estuda-primary/10">
                             <h3 className="text-lg font-black mb-5 flex items-center gap-3">
@@ -1562,6 +1633,65 @@ function App() {
                                         <div className="flex-1">
                                             <p className="text-xs font-bold">{authEmails.length} Professores Autorizados</p>
                                             <p className="text-[10px] opacity-40 font-medium">Os e-mails nesta lista serão promovidos automaticamente ao se cadastrarem.</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Gestão Global de Usuários — Somente SUPER ADM (Arlei) */}
+                        {isSuperAdmin && (
+                            <div className="bg-estuda-surface p-6 sm:p-8 rounded-[2.5rem] border border-yellow-500/20 shadow-[0_0_30px_rgba(234,179,8,0.05)]">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-lg font-black flex items-center gap-3 text-yellow-500">
+                                        <Users size={22} /> Gerenciar Todos os Usuários
+                                    </h3>
+                                    <button 
+                                        onClick={() => setIsManagingUsers(!isManagingUsers)}
+                                        className="text-[10px] font-black uppercase tracking-widest text-yellow-500 hover:underline"
+                                    >
+                                        {isManagingUsers ? 'Ocultar Lista' : 'Ver Todos'}
+                                    </button>
+                                </div>
+
+                                {isManagingUsers ? (
+                                    <div className="flex flex-col gap-4 animate-fade-in max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                        {usersList.length === 0 ? (
+                                            <p className="text-[10px] text-center opacity-30 italic py-4 font-bold uppercase tracking-widest text-white/40">Carregando usuários...</p>
+                                        ) : (
+                                            usersList.map(u => (
+                                                <div key={u.id} className="flex items-center justify-between bg-estuda-bg/50 p-4 rounded-2xl border border-white/5 group hover:border-yellow-500/20 transition-all">
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="text-xs font-black text-white truncate">{u.name}</span>
+                                                        <span className="text-[10px] font-bold text-white/40 truncate">{u.email}</span>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${u.role === 'admin' ? 'bg-red-500/20 text-red-400' : u.role === 'professor' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>
+                                                                {u.role}
+                                                            </span>
+                                                            <span className="text-[8px] opacity-20 font-bold text-white">Criado em {new Date(u.created_at).toLocaleDateString()}</span>
+                                                        </div>
+                                                    </div>
+                                                    {u.email !== 'arlei85@hotmail.com' && (
+                                                        <button 
+                                                            onClick={() => deleteUser(u.id, u.email)}
+                                                            className="p-2 text-red-400 opacity-40 group-hover:opacity-100 transition-all hover:bg-red-400/10 rounded-xl"
+                                                            title="Excluir Usuário"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-4 bg-estuda-bg/30 p-4 rounded-3xl border border-white/5 opacity-60">
+                                        <div className="size-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+                                            <Users size={24} />
+                                        </div>
+                                        <div className="flex-1 text-xs">
+                                            <p className="font-bold text-white">Painel de Controle de Usuários</p>
+                                            <p className="opacity-60 text-white">Visualize, filtre e gerencie permanentemente todos os cadastros do app.</p>
                                         </div>
                                     </div>
                                 )}
