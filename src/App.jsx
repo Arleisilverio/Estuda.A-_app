@@ -478,6 +478,31 @@ function App() {
 
     const generateQuiz = async (filterDocId = '') => {
         if (!selectedSubject) return
+
+        // Limite de 1 quiz por matéria por dia para alunos
+        if (userRole === 'student') {
+            try {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                const { count, error: checkError } = await supabase
+                    .from('quiz_history')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('user_id', session.user.id)
+                    .eq('subject_id', selectedSubject.id)
+                    .gte('created_at', today.toISOString());
+
+                if (checkError) throw checkError;
+
+                if (count && count > 0) {
+                    alert(`Você já realizou o quiz de "${selectedSubject.name}" hoje. \n\nPara otimizar seu aprendizado e evitar sobrecarga, permitimos apenas um quiz por matéria por dia. Volte amanhã para um novo desafio!`);
+                    return;
+                }
+            } catch (err) {
+                console.error('Erro ao verificar limite de quiz:', err);
+            }
+        }
+
         setLoading(true)
         setShowDocSelect(false)
         
