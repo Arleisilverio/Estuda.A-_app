@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary-accent: hsl(43, 100%, 59%);
+  --secondary-accent: hsl(232, 50%, 20%);
+  --highlight-accent: hsl(1, 95%, 50%);
+  --bg-dark: hsl(232, 93%, 8%);
+  --surface-dark: hsl(232, 93%, 12%);
+  --text-main: hsl(150, 16%, 95%);
+}
+
+body,
+#root {
+  background-color: var(--bg-dark) !important;
+  color: var(--text-main);
+  font-family: 'Lexend', sans-serif;
+  margin: 0;
+  min-height: 100vh;
+}
+
+.glass {
+  background: rgba(73, 76, 101, 0.4);
+  /* Baseado no surface-dark */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(165, 178, 235, 0.1);
+  /* Borda leve com primário */
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.dark-calendar-icon::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(0.8);
+}
