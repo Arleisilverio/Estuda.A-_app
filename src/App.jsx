@@ -1697,7 +1697,7 @@ function App() {
                                 <div className="relative shrink-0">
                                     <div className="absolute inset-0 bg-estuda-primary blur-2xl opacity-10 rounded-full" />
                                     <img 
-                                        src="https://www.gravatar.com/avatar/bf8858e8b091f86641e06dc77196237c?s=400&d=mp" 
+                                        src="https://i.supaimg.com/ab10c538-a9f0-4a7a-9c0d-5a65ded30e00/01193380-dc6a-41e9-835c-5598b06bfeca.jpg" 
                                         alt="Arlei Silvério" 
                                         className="size-24 rounded-3xl border-4 border-estuda-surface object-cover relative z-10 shadow-xl"
                                     />
