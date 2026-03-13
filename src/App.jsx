@@ -1921,64 +1921,65 @@ function App() {
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-col gap-4 animate-fade-in max-h-[400px] overflow-y-auto pr-2 custom-scrollbar scroll-smooth">
-                                        {loading && usersList.length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center py-8 gap-3">
-                                                <Loader2 size={24} className="text-yellow-500 animate-spin" />
-                                                <p className="text-[10px] opacity-30 font-bold uppercase tracking-widest text-white/40">Carregando usuários...</p>
-                                            </div>
-                                        ) : usersList.length === 0 ? (
-                                            <p className="text-[10px] text-center opacity-30 italic py-4 font-bold uppercase tracking-widest text-white/40">Nenhum usuário encontrado</p>
-                                        ) : (
-                                            usersList.map(u => (
-                                                <div key={u.id} className="flex items-center justify-between bg-estuda-bg/50 p-4 rounded-2xl border border-white/5 group hover:border-yellow-500/40 transition-all">
-                                                    <div className="flex items-center gap-4 min-w-0">
-                                                        <div className="size-10 rounded-2xl bg-estuda-primary/10 flex items-center justify-center border border-estuda-primary/10 overflow-hidden shrink-0">
-                                                            {u.avatar_url ? (
-                                                                <img src={u.avatar_url} alt="" className="size-full object-cover" />
-                                                            ) : (
-                                                                <User size={18} className="text-estuda-primary" />
-                                                            )}
-                                                        </div>
-                                                        <div className="flex flex-col min-w-0">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-sm font-black text-white truncate">{u.name || 'Sem Nome'}</span>
-                                                                {u.role === 'admin' && (
-                                                                    <span className="text-[8px] font-black uppercase tracking-tighter bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded-md border border-yellow-500/20 shrink-0">ADM</span>
+                                    {isManagingUsers ? (
+                                        <div className="flex flex-col gap-4 animate-fade-in max-h-[400px] overflow-y-auto pr-2 custom-scrollbar scroll-smooth">
+                                            {loading && usersList.length === 0 ? (
+                                                <div className="flex flex-col items-center justify-center py-8 gap-3">
+                                                    <Loader2 size={24} className="text-yellow-500 animate-spin" />
+                                                    <p className="text-[10px] opacity-30 font-bold uppercase tracking-widest text-white/40">Carregando usuários...</p>
+                                                </div>
+                                            ) : usersList.length === 0 ? (
+                                                <p className="text-[10px] text-center opacity-30 italic py-4 font-bold uppercase tracking-widest text-white/40">Nenhum usuário encontrado</p>
+                                            ) : (
+                                                usersList.map(u => (
+                                                    <div key={u.id} className="flex items-center justify-between bg-estuda-bg/50 p-4 rounded-2xl border border-white/5 group hover:border-yellow-500/40 transition-all">
+                                                        <div className="flex items-center gap-4 min-w-0">
+                                                            <div className="size-10 rounded-2xl bg-estuda-primary/10 flex items-center justify-center border border-estuda-primary/10 overflow-hidden shrink-0">
+                                                                {u.avatar_url ? (
+                                                                    <img src={u.avatar_url} alt="" className="size-full object-cover" />
+                                                                ) : (
+                                                                    <User size={18} className="text-estuda-primary" />
                                                                 )}
                                                             </div>
-                                                            <div className="flex items-center gap-2 mt-1">
-                                                                <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 ${u.role === 'admin' ? 'bg-red-500/20 text-red-400' : u.role === 'professor' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>
-                                                                    {u.role || 'estudante'}
-                                                                </span>
-                                                                <span className="text-[8px] opacity-20 font-bold text-white whitespace-nowrap">Desde {u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '---'}</span>
+                                                            <div className="flex flex-col min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-sm font-black text-white truncate">{u.name || 'Sem Nome'}</span>
+                                                                    {u.role === 'admin' && (
+                                                                        <span className="text-[8px] font-black uppercase tracking-tighter bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded-md border border-yellow-500/20 shrink-0">ADM</span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 ${u.role === 'admin' ? 'bg-red-500/20 text-red-400' : u.role === 'professor' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>
+                                                                        {u.role || 'estudante'}
+                                                                    </span>
+                                                                    <span className="text-[8px] opacity-20 font-bold text-white whitespace-nowrap">Desde {u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '---'}</span>
+                                                                </div>
                                                             </div>
                                                         </div>
+                                                        {u.email !== 'arlei85@hotmail.com' && isSuperAdmin && (
+                                                            <button 
+                                                                onClick={() => deleteUser(u.id, u.name || u.email)}
+                                                                className="p-2 text-red-400 opacity-40 group-hover:opacity-100 transition-all hover:bg-red-400/10 rounded-xl"
+                                                                title="Excluir Usuário"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        )}
                                                     </div>
-                                                    {u.email !== 'arlei85@hotmail.com' && isSuperAdmin && (
-                                                        <button 
-                                                            onClick={() => deleteUser(u.id, u.name || u.email)}
-                                                            className="p-2 text-red-400 opacity-40 group-hover:opacity-100 transition-all hover:bg-red-400/10 rounded-xl"
-                                                            title="Excluir Usuário"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-4 bg-estuda-bg/30 p-4 rounded-3xl border border-white/5 opacity-60">
-                                        <div className="size-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center text-yellow-500">
-                                            <Users size={24} />
+                                                ))
+                                            )}
                                         </div>
-                                        <div className="flex-1 text-xs">
-                                            <p className="font-bold text-white">Painel de Controle de Usuários</p>
-                                            <p className="opacity-60 text-white">Visualize, filtre e gerencie permanentemente todos os cadastros do app.</p>
+                                    ) : (
+                                        <div className="flex items-center gap-4 bg-estuda-bg/30 p-4 rounded-3xl border border-white/5 opacity-60">
+                                            <div className="size-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+                                                <Users size={24} />
+                                            </div>
+                                            <div className="flex-1 text-xs">
+                                                <p className="font-bold text-white">Painel de Controle de Usuários</p>
+                                                <p className="opacity-60 text-white">Visualize, filtre e gerencie permanentemente todos os cadastros do app.</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
                             </div>
                         )}
                     </section>
