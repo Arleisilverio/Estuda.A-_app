@@ -108,7 +108,8 @@ function App() {
 
     // Estado do Perfil do Aluno
     const [perfil, setPerfil] = useState({ nome: '', turma: '', turno: '', curso: '', periodo: '', avatar: null })
-    const [showPerfilForm, setShowPerfilForm] = useState(false)
+    // const [showAbout, setShowAbout] = useState(false) // Removido: integrado na página
+    // const [showPerfilForm, setShowPerfilForm] = useState(false) // Removido: integrado na página
     const [perfilDraft, setPerfilDraft] = useState({ nome: '', turma: '', turno: '', curso: '', periodo: '', avatar: null })
 
     // Estado da Grade
@@ -127,13 +128,31 @@ function App() {
     const [usersList, setUsersList] = useState([])
 
     const fetchUsersList = async () => {
+        if (loading) return
         setLoading(true)
         try {
+            console.log('Buscando lista de usuários...')
             const { data, error } = await supabase.functions.invoke('user-management', {
                 body: { action: 'list' }
             })
-            if (error) throw error
-            if (data.users) setUsersList(data.users)
+            
+            if (error) {
+                console.error('Erro na função user-management:', error)
+                // Fallback: Tentar buscar diretamente da tabela de perfis se a função falhar
+                const { data: profiles, error: pError } = await supabase
+                    .from('profiles')
+                    .select('id, name, email')
+                
+                if (!pError && profiles) {
+                    setUsersList(profiles)
+                }
+                return
+            }
+
+            // Normalizar resposta (pode vir como {users: []} ou [])
+            const users = data?.users || (Array.isArray(data) ? data : [])
+            console.log('Usuários recebidos:', users.length)
+            setUsersList(users)
         } catch (err) {
             console.error('Erro ao buscar lista de usuários:', err)
         } finally {
@@ -248,7 +267,8 @@ function App() {
 
             if (error) throw error
             setPerfil(perfilDraft)
-            setShowPerfilForm(false)
+            setPerfil(perfilDraft)
+            // setShowPerfilForm(false) // Removido
         } catch (e) {
             console.error('Erro ao salvar perfil:', e)
             alert('Erro ao salvar perfil.')
@@ -258,7 +278,7 @@ function App() {
     }
     const openPerfilForm = () => {
         setPerfilDraft({ ...perfil })
-        setShowPerfilForm(true)
+        // setShowPerfilForm(true) // Removido
     }
     const SUBJECT_ICONS = ['⚖️', '📖', '🏛️', '📜', '🎓', '💼', '✌️', '📚']
 
@@ -1474,52 +1494,129 @@ function App() {
                 {/* Aba Perfil */}
                 {activeTab === 'perfil' && !selectedSubject && (
                     <section className="animate-fade-in flex flex-col gap-6 pb-24">
-
-                        {/* Card do Perfil */}
+                        {/* Card do Perfil Integrado */}
                         <div className="bg-estuda-surface rounded-[2.5rem] border border-estuda-primary/10 overflow-hidden">
                             {/* Banner */}
                             <div className="h-24 bg-gradient-to-r from-estuda-primary/30 to-blue-600/20 relative"></div>
 
                             <div className="px-6 pb-6">
-                                {/* Avatar + Botão Editar */}
-                                <div className="flex items-end justify-between -mt-10 mb-4">
-                                    <div className="relative">
+                                {/* Avatar */}
+                                <div className="flex items-end justify-between -mt-10 mb-8">
+                                    <label className="cursor-pointer group relative">
                                         {perfilDraft.avatar ? (
-                                            <img src={perfilDraft.avatar} alt="avatar" className="w-20 h-20 rounded-3xl border-4 border-estuda-surface object-cover shadow-xl" />
+                                            <img src={perfilDraft.avatar} alt="avatar" className="w-24 h-24 rounded-3xl border-4 border-estuda-surface object-cover shadow-xl" />
                                         ) : (
-                                            <div className="w-20 h-20 rounded-3xl border-4 border-estuda-surface bg-estuda-primary/20 flex items-center justify-center shadow-xl">
-                                                <User size={36} className="text-estuda-primary" />
+                                            <div className="w-24 h-24 rounded-3xl border-4 border-estuda-surface bg-estuda-primary/20 flex items-center justify-center shadow-xl">
+                                                <User size={40} className="text-estuda-primary" />
                                             </div>
                                         )}
+                                        <div className="absolute -bottom-1 -right-1 bg-estuda-primary rounded-xl p-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Upload size={12} className="text-white" />
+                                        </div>
+                                        <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+                                    </label>
+                                    <div className="flex gap-2 mb-2">
+                                        <button
+                                            onClick={handleSavePerfil}
+                                            disabled={loading}
+                                            className="bg-estuda-primary text-white px-6 py-2.5 rounded-2xl font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2"
+                                        >
+                                            {loading ? <Loader2 size={14} className="animate-spin" /> : <Settings size={14} />}
+                                            Salvar Perfil
+                                        </button>
                                     </div>
-                                    <button
-                                        onClick={openPerfilForm}
-                                        className="flex items-center gap-2 bg-estuda-primary text-white px-5 py-2 rounded-2xl font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-lg"
-                                    >
-                                        <Settings size={14} /> {perfil.nome ? 'Editar Perfil' : 'Configurar Perfil'}
-                                    </button>
-                                    <button
-                                        onClick={() => setShowAbout(true)}
-                                        className="flex items-center gap-2 bg-white/5 text-white/60 px-5 py-2 rounded-2xl font-black text-xs hover:bg-white/10 hover:text-white transition-all border border-white/5"
-                                    >
-                                        <Sparkles size={14} /> Sobre o Criador
-                                    </button>
                                 </div>
 
-                                {/* Dados */}
-                                {perfil.nome ? (
-                                    <div className="flex flex-col gap-1">
-                                        <h2 className="text-xl font-black">{perfil.nome}</h2>
-                                        <div className="flex flex-wrap gap-2 mt-2">
-                                            {perfil.curso && <span className="text-[10px] font-black uppercase tracking-wider bg-estuda-primary/10 text-estuda-primary px-3 py-1 rounded-full border border-estuda-primary/20">{perfil.curso}</span>}
-                                            {perfil.periodo && <span className="text-[10px] font-black uppercase tracking-wider bg-white/5 px-3 py-1 rounded-full border border-white/10">{perfil.periodo}º Período</span>}
-                                            {perfil.turma && <span className="text-[10px] font-black uppercase tracking-wider bg-white/5 px-3 py-1 rounded-full border border-white/10">Turma {perfil.turma}</span>}
-                                            {perfil.turno && <span className="text-[10px] font-black uppercase tracking-wider bg-white/5 px-3 py-1 rounded-full border border-white/10">{perfil.turno}</span>}
+                                {/* Formulário de Edição Direto na Página */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Nome Completo</label>
+                                            <input
+                                                type="text" placeholder="Seu nome completo"
+                                                value={perfilDraft.nome}
+                                                onChange={e => setPerfilDraft(p => ({ ...p, nome: e.target.value }))}
+                                                className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors text-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Curso</label>
+                                            <input
+                                                type="text" placeholder="Ex: Direito"
+                                                value={perfilDraft.curso}
+                                                onChange={e => setPerfilDraft(p => ({ ...p, curso: e.target.value }))}
+                                                className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors text-white"
+                                            />
                                         </div>
                                     </div>
-                                ) : (
-                                    <p className="text-sm opacity-40 font-semibold">Clique em "Configurar Perfil" para preencher seus dados.</p>
-                                )}
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Período</label>
+                                                <select
+                                                    value={perfilDraft.periodo}
+                                                    onChange={e => setPerfilDraft(p => ({ ...p, periodo: e.target.value }))}
+                                                    className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-estuda-primary/50 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M5%207L10%2012L15%207%22%20stroke%3D%22%234A90E2%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E')] bg-[length:20px] bg-[right_12px_center] bg-no-repeat pr-10"
+                                                >
+                                                    <option value="">--</option>
+                                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n}º</option>)}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Turno</label>
+                                                <select
+                                                    value={perfilDraft.turno}
+                                                    onChange={e => setPerfilDraft(p => ({ ...p, turno: e.target.value }))}
+                                                    className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-estuda-primary/50 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M5%207L10%2012L15%207%22%20stroke%3D%22%234A90E2%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E')] bg-[length:20px] bg-[right_12px_center] bg-no-repeat pr-10"
+                                                >
+                                                    <option value="">--</option>
+                                                    <option value="Manhã">Manhã</option>
+                                                    <option value="Tarde">Tarde</option>
+                                                    <option value="Noite">Noite</option>
+                                                    <option value="Integral">Integral</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Turma</label>
+                                            <input
+                                                type="text" placeholder="Ex: DIR-001"
+                                                value={perfilDraft.turma}
+                                                onChange={e => setPerfilDraft(p => ({ ...p, turma: e.target.value }))}
+                                                className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors text-white"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Seção Sobre o Criador Integrada */}
+                        <div className="bg-estuda-surface p-6 sm:p-8 rounded-[2.5rem] border border-estuda-primary/10 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-estuda-primary/5 rounded-bl-[5rem] -z-0"></div>
+                            <h3 className="text-lg font-black mb-6 flex items-center gap-3 relative z-10">
+                                <Sparkles size={22} className="text-estuda-primary" /> Sobre o Criador
+                            </h3>
+                            <div className="flex flex-col sm:flex-row items-center gap-6 relative z-10">
+                                <div className="relative shrink-0">
+                                    <div className="absolute inset-0 bg-estuda-primary blur-2xl opacity-10 rounded-full" />
+                                    <img 
+                                        src="https://www.gravatar.com/avatar/cedf2434de54e58a0e2a9693e5077464?s=400&d=mp" 
+                                        alt="Arlei Silvério" 
+                                        className="size-24 rounded-3xl border-4 border-estuda-surface object-cover relative z-10 shadow-xl"
+                                    />
+                                </div>
+                                <div className="flex-1 text-center sm:text-left">
+                                    <h4 className="text-xl font-black text-white">Arlei Silvério</h4>
+                                    <p className="text-estuda-primary font-black text-[9px] uppercase tracking-widest mb-3">Idealizador & Desenvolvedor</p>
+                                    <p className="text-xs leading-relaxed text-white/50 font-medium mb-4 italic">
+                                        "Focado em transformar a educação através da tecnologia e inteligência artificial."
+                                    </p>
+                                    <a href="mailto:arlei85@hotmail.com" className="inline-flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/5 hover:bg-white/10 transition-all">
+                                        <Mail size={14} className="text-estuda-primary" />
+                                        <span className="text-xs font-bold">arlei85@hotmail.com</span>
+                                    </a>
+                                </div>
                             </div>
                         </div>
 
@@ -1529,9 +1626,9 @@ function App() {
                                 onClick={deleteOwnAccount}
                                 className="w-full flex items-center justify-center gap-3 p-4 rounded-3xl border border-red-500/20 bg-red-500/5 text-red-500 font-black text-xs uppercase tracking-widest hover:bg-red-500/10 transition-all active:scale-[0.98]"
                             >
-                                <Trash2 size={16} /> Excluir Minha Conta
+                                <Trash2 size={16} /> Excluir Minha Conta Permanente
                             </button>
-                            <p className="text-[9px] text-center text-white/20 mt-3 font-bold uppercase tracking-tighter">Atenção: A exclusão é imediata e irreversível.</p>
+                            <p className="text-[9px] text-center text-white/20 mt-3 font-bold uppercase tracking-tighter">Atenção: A exclusão é imediata e apagará todos os seus dados.</p>
                         </div>
 
                         {/* Histórico de Quizzes */}
@@ -1643,11 +1740,23 @@ function App() {
                         {isSuperAdmin && (
                             <div className="bg-estuda-surface p-6 sm:p-8 rounded-[2.5rem] border border-yellow-500/20 shadow-[0_0_30px_rgba(234,179,8,0.05)]">
                                 <div className="flex items-center justify-between mb-6">
-                                    <h3 className="text-lg font-black flex items-center gap-3 text-yellow-500">
-                                        <Users size={22} /> Gerenciar Todos os Usuários
-                                    </h3>
+                                    <div className="flex items-center gap-3 text-yellow-500">
+                                        <div className="relative">
+                                            <Users size={22} className="font-black" />
+                                            {usersList.length > 0 && (
+                                                <span className="absolute -top-2 -right-2 bg-yellow-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center ring-2 ring-estuda-surface">
+                                                    {usersList.length}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <h3 className="text-lg font-black">Gerenciar Todos os Usuários</h3>
+                                    </div>
                                     <button 
-                                        onClick={() => setIsManagingUsers(!isManagingUsers)}
+                                        onClick={() => {
+                                            const newState = !isManagingUsers
+                                            setIsManagingUsers(newState)
+                                            if (newState) fetchUsersList()
+                                        }}
                                         className="text-[10px] font-black uppercase tracking-widest text-yellow-500 hover:underline"
                                     >
                                         {isManagingUsers ? 'Ocultar Lista' : 'Ver Todos'}
@@ -1655,12 +1764,17 @@ function App() {
                                 </div>
 
                                 {isManagingUsers ? (
-                                    <div className="flex flex-col gap-4 animate-fade-in max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                                        {usersList.length === 0 ? (
-                                            <p className="text-[10px] text-center opacity-30 italic py-4 font-bold uppercase tracking-widest text-white/40">Carregando usuários...</p>
+                                    <div className="flex flex-col gap-4 animate-fade-in max-h-[400px] overflow-y-auto pr-2 custom-scrollbar scroll-smooth">
+                                        {loading && usersList.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-8 gap-3">
+                                                <Loader2 size={24} className="text-yellow-500 animate-spin" />
+                                                <p className="text-[10px] opacity-30 font-bold uppercase tracking-widest text-white/40">Carregando usuários...</p>
+                                            </div>
+                                        ) : usersList.length === 0 ? (
+                                            <p className="text-[10px] text-center opacity-30 italic py-4 font-bold uppercase tracking-widest text-white/40">Nenhum usuário encontrado</p>
                                         ) : (
                                             usersList.map(u => (
-                                                <div key={u.id} className="flex items-center justify-between bg-estuda-bg/50 p-4 rounded-2xl border border-white/5 group hover:border-yellow-500/20 transition-all">
+                                                <div key={u.id} className="flex items-center justify-between bg-estuda-bg/50 p-4 rounded-2xl border border-white/5 group hover:border-yellow-500/40 transition-all">
                                                     <div className="flex flex-col min-w-0">
                                                         <span className="text-xs font-black text-white truncate">{u.name}</span>
                                                         <span className="text-[10px] font-bold text-white/40 truncate">{u.email}</span>
@@ -1973,305 +2087,7 @@ function App() {
                 </div>
             )}
 
-            {/* Modal de Perfil do Aluno */}
-            {showPerfilForm && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)' }}>
-                    <div className="bg-estuda-surface w-full max-w-md rounded-[2rem] border border-white/10 shadow-2xl p-6 flex flex-col gap-5 overflow-y-auto" style={{ maxHeight: '90vh' }}>
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-tight">
-                                <User size={20} className="text-estuda-primary" /> Meu Perfil
-                            </h3>
-                            <button onClick={() => setShowPerfilForm(false)} className="p-2 rounded-xl hover:bg-white/5 opacity-50 hover:opacity-100 transition-all text-sm font-bold">✕</button>
-                        </div>
-
-                        <div className="flex flex-col items-center gap-2">
-                            <label className="cursor-pointer group relative">
-                                {perfilDraft.avatar ? (
-                                    <img src={perfilDraft.avatar} alt="avatar" className="w-24 h-24 rounded-3xl object-cover border-4 border-estuda-primary/30 shadow-lg" />
-                                ) : (
-                                    <div className="w-24 h-24 rounded-3xl bg-estuda-primary/15 border-2 border-dashed border-estuda-primary/30 flex flex-col items-center justify-center">
-                                        <User size={32} className="text-estuda-primary/60" />
-                                        <span className="text-[9px] font-bold opacity-50 mt-1">FOTO</span>
-                                    </div>
-                                )}
-                                <div className="absolute -bottom-1 -right-1 bg-estuda-primary rounded-xl p-1.5 shadow-lg">
-                                    <Upload size={12} className="text-white" />
-                                </div>
-                                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
-                            </label>
-                            <p className="text-[10px] opacity-40 font-semibold">Toque para adicionar foto</p>
-                        </div>
-
-                        <div className="flex flex-col gap-3">
-                            <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Nome Completo</label>
-                                <div className="relative group">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-estuda-primary transition-colors">
-                                        <User size={18} />
-                                    </div>
-                                    <input
-                                        type="text" placeholder="Seu nome completo"
-                                        value={perfilDraft.nome}
-                                        onChange={e => setPerfilDraft(p => ({ ...p, nome: e.target.value }))}
-                                        className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors text-white placeholder:text-white/20"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Curso</label>
-                                <div className="relative group">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-estuda-primary transition-colors">
-                                        <GraduationCap size={18} />
-                                    </div>
-                                    <input
-                                        type="text" placeholder="Ex: Direito"
-                                        value={perfilDraft.curso}
-                                        onChange={e => setPerfilDraft(p => ({ ...p, curso: e.target.value }))}
-                                        className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors text-white placeholder:text-white/20"
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Período</label>
-                                    <select
-                                        value={perfilDraft.periodo}
-                                        onChange={e => setPerfilDraft(p => ({ ...p, periodo: e.target.value }))}
-                                        className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-estuda-primary/50 transition-colors"
-                                    >
-                                        <option value="">--</option>
-                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n}º</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Turno</label>
-                                    <select
-                                        value={perfilDraft.turno}
-                                        onChange={e => setPerfilDraft(p => ({ ...p, turno: e.target.value }))}
-                                        className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-estuda-primary/50 transition-colors"
-                                    >
-                                        <option value="">--</option>
-                                        <option value="Manhã">Manhã</option>
-                                        <option value="Tarde">Tarde</option>
-                                        <option value="Noite">Noite</option>
-                                        <option value="Integral">Integral</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Turma</label>
-                                <div className="relative group">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-estuda-primary transition-colors">
-                                        <Layers size={18} />
-                                    </div>
-                                    <input
-                                        type="text" placeholder="Ex: DIR-001 ou Turmas Normais"
-                                        value={perfilDraft.turma}
-                                        onChange={e => setPerfilDraft(p => ({ ...p, turma: e.target.value }))}
-                                        className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors text-white"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-3 pt-2 border-t border-white/5">
-                            <button
-                                type="button" onClick={() => setShowPerfilForm(false)}
-                                className="flex-1 py-3.5 rounded-2xl font-black text-sm border border-white/10 hover:bg-white/5 transition-colors"
-                            >CANCELAR</button>
-                            <button
-                                type="button" onClick={handleSavePerfil}
-                                className="flex-1 py-3.5 rounded-2xl font-black text-sm bg-estuda-primary text-white hover:scale-105 active:scale-95 transition-all shadow-xl"
-                            >SALVAR</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* Modal Adicionar Aula à Grade */}
-            {showScheduleForm && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowScheduleForm(false)}></div>
-                    <div className="bg-estuda-surface border border-estuda-primary/20 p-6 sm:p-8 rounded-[2.5rem] shadow-2xl w-full max-w-md relative z-10 animate-fade-in flex flex-col overflow-y-auto" style={{ maxHeight: '90vh' }}>
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
-                                <Calendar size={24} className="text-estuda-primary" /> Nova Aula
-                            </h3>
-                            <button onClick={() => setShowScheduleForm(false)} className="p-2 rounded-xl hover:bg-white/5 opacity-50 hover:opacity-100 transition-all text-white font-bold text-sm">✕</button>
-                        </div>
-
-                        <form onSubmit={handleAddScheduleItem} className="flex flex-col gap-4">
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Dia da Semana</label>
-                                    <select
-                                        value={newScheduleItem.day_of_week}
-                                        onChange={e => setNewScheduleItem({ ...newScheduleItem, day_of_week: e.target.value })}
-                                        className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-bold text-white focus:outline-none focus:border-estuda-primary/50"
-                                    >
-                                        <option value="SEG">Segunda</option>
-                                        <option value="TER">Terça</option>
-                                        <option value="QUA">Quarta</option>
-                                        <option value="QUI">Quinta</option>
-                                        <option value="SEX">Sexta</option>
-                                        <option value="SÁB">Sábado</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Cor</label>
-                                    <div className="flex gap-2 bg-estuda-bg p-2 rounded-2xl border border-estuda-primary/10 justify-between">
-                                        {['#EAB308', '#3B82F6', '#A855F7', '#22C55E', '#F97316'].map(c => (
-                                            <button
-                                                key={c} type="button"
-                                                onClick={() => setNewScheduleItem({ ...newScheduleItem, color: c })}
-                                                style={{ background: c }}
-                                                className={`size-6 rounded-full transition-all ${newScheduleItem.color === c ? 'scale-125 border-2 border-white' : 'opacity-40 hover:opacity-100'}`}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Matéria / Disciplina</label>
-                                <input
-                                    required type="text" placeholder="Ex: Direito Civil II"
-                                    value={newScheduleItem.subject_name}
-                                    onChange={e => setNewScheduleItem({ ...newScheduleItem, subject_name: e.target.value })}
-                                    className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-bold text-white focus:outline-none focus:border-estuda-primary/50"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Professor ou Sala</label>
-                                <input
-                                    type="text" placeholder="Ex: Prof. Wilian - Sala 202"
-                                    value={newScheduleItem.prof}
-                                    onChange={e => setNewScheduleItem({ ...newScheduleItem, prof: e.target.value })}
-                                    className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-bold text-white focus:outline-none focus:border-estuda-primary/50"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Início</label>
-                                    <input
-                                        type="time" value={newScheduleItem.start_time}
-                                        onChange={e => setNewScheduleItem({ ...newScheduleItem, start_time: e.target.value })}
-                                        className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-bold text-white focus:outline-none focus:border-estuda-primary/50"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Fim</label>
-                                    <input
-                                        type="time" value={newScheduleItem.end_time}
-                                        onChange={e => setNewScheduleItem({ ...newScheduleItem, end_time: e.target.value })}
-                                        className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-bold text-white focus:outline-none focus:border-estuda-primary/50"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex gap-3 pt-4 border-t border-white/5">
-                                <button type="button" onClick={() => setShowScheduleForm(false)} className="flex-1 py-3.5 rounded-2xl font-black text-xs border border-white/10 hover:bg-white/5">CANCELAR</button>
-                                <button type="submit" disabled={loading} className="flex-1 py-3.5 rounded-2xl font-black text-xs bg-estuda-primary text-white hover:scale-105 active:scale-95 shadow-xl flex items-center justify-center gap-2">
-                                    {loading ? <Loader2 className="animate-spin" size={16} /> : 'SALVAR AULA'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal de Seleção de Documento para o Quiz */}
-            {showDocSelect && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowDocSelect(false)}></div>
-                    <div className="bg-estuda-surface border border-estuda-primary/20 p-6 sm:p-8 rounded-[2.5rem] shadow-2xl w-full max-w-md relative z-10 animate-fade-in flex flex-col">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
-                                <FileQuestion size={24} className="text-estuda-primary" /> Qual Material?
-                            </h3>
-                            <button onClick={() => setShowDocSelect(false)} className="p-2 rounded-xl hover:bg-white/5 opacity-50 hover:opacity-100 transition-all text-white font-bold text-sm">✕</button>
-                        </div>
-                        <p className="text-sm text-white/70 mb-6 font-medium leading-relaxed">Esta matéria tem mais de uma fonte de estudo.<br/>Sobre qual delas você deseja testar seus conhecimentos agora?</p>
-                        
-                        <div className="flex flex-col gap-3 mb-8 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
-                            {files.map(file => (
-                                <button
-                                    key={file.id}
-                                    onClick={() => setSelectedDocId(file.id)}
-                                    className={`p-4 rounded-2xl border text-left flex items-center gap-4 transition-all ${selectedDocId === file.id ? 'bg-estuda-primary/20 border-estuda-primary text-white shadow-lg scale-[1.02]' : 'bg-estuda-bg border-white/5 text-white/70 hover:bg-white/5 hover:border-white/20'}`}
-                                >
-                                    <div className={`p-2 rounded-lg ${selectedDocId === file.id ? 'bg-estuda-primary text-white' : 'bg-white/10'}`}>
-                                        <FileText size={20} />
-                                    </div>
-                                    <div className="flex-1 overflow-hidden">
-                                        <p className="font-bold text-sm truncate">{file.name}</p>
-                                    </div>
-                                    <div className={`size-5 rounded-full border-2 flex items-center justify-center ${selectedDocId === file.id ? 'border-estuda-primary bg-estuda-primary' : 'border-white/20'}`}>
-                                        {selectedDocId === file.id && <div className="size-2 bg-white rounded-full"></div>}
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="flex gap-3 pt-4 border-t border-white/5">
-                            <button onClick={() => setShowDocSelect(false)} className="flex-1 py-3.5 rounded-2xl font-black text-xs border border-white/10 hover:bg-white/5 transition-colors">CANCELAR</button>
-                             <button 
-                                onClick={() => executePendingAction(pendingAction, selectedDocId)} 
-                                disabled={(!selectedDocId && files.length > 1) || loading} 
-                                className={`flex-1 py-3.5 rounded-2xl font-black text-xs shadow-xl flex items-center justify-center gap-2 transition-all ${selectedDocId || files.length === 1 ? 'bg-estuda-primary text-white hover:scale-105 active:scale-95' : 'bg-estuda-primary/20 text-white/40 cursor-not-allowed border-none'}`}
-                            >
-                                {loading ? <Loader2 className="animate-spin" size={16} /> : 'INICIAR'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal Sobre o Criador */}
-            {showAbout && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6 pointer-events-auto">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowAbout(false)} />
-                    <div className="bg-estuda-surface border border-estuda-primary/20 w-full max-w-sm rounded-[3rem] p-8 flex flex-col items-center relative z-20 animate-scale-up shadow-[0_0_50px_rgba(74,144,226,0.15)]">
-                        <div className="relative mb-6">
-                            <div className="absolute inset-0 bg-estuda-primary blur-2xl opacity-20 rounded-full" />
-                            <img 
-                                src="https://www.gravatar.com/avatar/240cf86f87d7b1a646c1097e3a9856ad?s=400&d=mp" 
-                                alt="Arlei Silvério" 
-                                className="size-32 rounded-[2.5rem] border-4 border-estuda-surface object-cover relative z-10 shadow-2xl shadow-black/50"
-                            />
-                        </div>
-                        
-                        <h3 className="text-2xl font-black text-white text-center">Arlei Silvério</h3>
-                        <p className="text-estuda-primary font-black text-[10px] uppercase tracking-[0.3em] mt-1">Idealizador & Desenvolvedor</p>
-                        
-                        <div className="w-full h-px bg-white/5 my-6" />
-                        
-                        <div className="flex flex-col gap-4 w-full">
-                            <a href="mailto:arlei85@hotmail.com" className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5 hover:border-estuda-primary/30 hover:bg-white/10 transition-all group">
-                                <div className="size-10 rounded-xl bg-estuda-primary/10 flex items-center justify-center text-estuda-primary group-hover:scale-110 transition-transform">
-                                    <Mail size={20} />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40">E-mail</p>
-                                    <p className="text-sm font-bold text-white">arlei85@hotmail.com</p>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <p className="text-center text-[11px] leading-relaxed text-white/40 font-medium mt-8">
-                            "Focado em transformar a educação através da tecnologia e inteligência artificial."
-                        </p>
-
-                        <button 
-                            onClick={() => setShowAbout(false)}
-                            className="mt-10 w-full py-4 rounded-2xl bg-white/5 border border-white/10 font-black text-xs uppercase tracking-widest hover:bg-white/10 transition-colors"
-                        >
-                            Fechar
-                        </button>
-                    </div>
-                </div>
-            )}
+            {/* Removido Modais de Perfil e Sobre redundantes */}
 
             <style>{`
                 @keyframes scale-up {
