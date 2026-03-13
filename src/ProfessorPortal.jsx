@@ -26,7 +26,6 @@ export default function ProfessorPortal({ session, onLogout }) {
     const [loading, setLoading] = useState(true)
     const [messages, setMessages] = useState([])
     const [query, setQuery] = useState('')
-    const [showAbout, setShowAbout] = useState(false)
     
     // Onboarding para novos professores
     const [showOnboarding, setShowOnboarding] = useState(false)
@@ -475,27 +474,6 @@ export default function ProfessorPortal({ session, onLogout }) {
                             </div>
                         </div>
                     </div>
-                    {/* Anotações do Professor */}
-                    <div className="bg-estuda-surface border border-estuda-primary/10 rounded-[2rem] p-6 shadow-lg">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-sm font-black uppercase tracking-widest opacity-50 pl-1">Anotações para Alunos</h3>
-                            <button 
-                                onClick={handleUpdateNote}
-                                disabled={savingNote || !selectedSubject}
-                                className="text-[10px] font-black uppercase text-estuda-primary hover:underline disabled:opacity-30"
-                            >
-                                {savingNote ? 'Salvando...' : 'Salvar'}
-                            </button>
-                        </div>
-                        <textarea
-                            value={professorNote}
-                            onChange={e => setProfessorNote(e.target.value)}
-                            placeholder="Anote aqui pontos importantes da sua matéria que os alunos devem focar..."
-                            className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl p-4 text-xs font-medium focus:outline-none focus:border-estuda-primary/50 transition-colors placeholder:text-white/20 text-white min-h-[120px] resize-none"
-                        />
-                    </div>
-
-                    {/* Botão Agendar Prova */}
                     <button
                         onClick={() => {
                             setNewExam({ ...newExam, subject: selectedSubject?.name || '' })
@@ -518,20 +496,25 @@ export default function ProfessorPortal({ session, onLogout }) {
                                 <p className="text-[10px] opacity-50 font-medium">Valide se o Professor Virtual aprendeu o conteúdo corretamente</p>
                             </div>
                         </div>
+                    </div>
+
+                    <div className="px-6 py-4 bg-estuda-bg/20 border-b border-estuda-primary/10">
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-estuda-primary">Anotações para os Alunos</label>
                             <button 
-                                onClick={onLogout}
-                                className="p-3 rounded-2xl bg-white/5 text-white/40 hover:text-red-400 hover:bg-red-400/10 transition-all border border-white/5"
-                                title="Sair"
+                                onClick={handleUpdateNote}
+                                disabled={savingNote || !selectedSubject}
+                                className="text-[9px] font-black uppercase bg-estuda-primary/10 text-estuda-primary px-3 py-1 rounded-lg hover:bg-estuda-primary/20 disabled:opacity-30 transition-all"
                             >
-                                <LogOut size={20} />
+                                {savingNote ? 'Salvando...' : 'Salvar Alterações'}
                             </button>
-                            <button 
-                                onClick={() => setShowAbout(true)}
-                                className="p-3 rounded-2xl bg-estuda-primary text-white hover:scale-105 active:scale-95 transition-all shadow-lg"
-                                title="Sobre o Criador"
-                            >
-                                <Sparkles size={20} />
-                            </button>
+                        </div>
+                        <textarea
+                            value={professorNote}
+                            onChange={e => setProfessorNote(e.target.value)}
+                            placeholder="Anote aqui dicas, pontos da prova ou avisos importantes para sua turma..."
+                            className="w-full bg-estuda-bg/50 border border-estuda-primary/5 rounded-xl p-3 text-xs font-medium focus:outline-none focus:border-estuda-primary/30 transition-colors placeholder:text-white/10 text-white/80 min-h-[80px] resize-none"
+                        />
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-estuda-bg/10">
@@ -591,50 +574,6 @@ export default function ProfessorPortal({ session, onLogout }) {
                 </div>
             </div>
 
-            {/* Modal Sobre o Criador */}
-            {showAbout && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6 pointer-events-auto">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowAbout(false)} />
-                    <div className="bg-estuda-surface border border-estuda-primary/20 w-full max-w-sm rounded-[3rem] p-8 flex flex-col items-center relative z-20 animate-scale-up shadow-[0_0_50px_rgba(74,144,226,0.15)]">
-                        <div className="relative mb-6">
-                            <div className="absolute inset-0 bg-estuda-primary blur-2xl opacity-20 rounded-full" />
-                            <img 
-                                src="https://www.gravatar.com/avatar/240cf86f87d7b1a646c1097e3a9856ad?s=400&d=mp" 
-                                alt="Arlei Silvério" 
-                                className="size-32 rounded-[2.5rem] border-4 border-estuda-surface object-cover relative z-10 shadow-2xl shadow-black/50"
-                            />
-                        </div>
-                        
-                        <h3 className="text-2xl font-black text-white text-center">Arlei Silvério</h3>
-                        <p className="text-estuda-primary font-black text-[10px] uppercase tracking-[0.3em] mt-1">Idealizador & Desenvolvedor</p>
-                        
-                        <div className="w-full h-px bg-white/5 my-6" />
-                        
-                        <div className="flex flex-col gap-4 w-full">
-                            <a href="mailto:arlei85@hotmail.com" className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5 hover:border-estuda-primary/30 hover:bg-white/10 transition-all group">
-                                <div className="size-10 rounded-xl bg-estuda-primary/10 flex items-center justify-center text-estuda-primary group-hover:scale-110 transition-transform">
-                                    <Mail size={20} />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40">E-mail</p>
-                                    <p className="text-sm font-bold text-white">arlei85@hotmail.com</p>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <p className="text-center text-[11px] leading-relaxed text-white/40 font-medium mt-8">
-                            "Focado em transformar a educação através da tecnologia e inteligência artificial."
-                        </p>
-
-                        <button 
-                            onClick={() => setShowAbout(false)}
-                            className="mt-10 w-full py-4 rounded-2xl bg-white/5 border border-white/10 font-black text-xs uppercase tracking-widest hover:bg-white/10 transition-colors"
-                        >
-                            Fechar
-                        </button>
-                    </div>
-                </div>
-            )}
             {/* Modal de Agendamento de Prova */}
             {showExamForm && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">

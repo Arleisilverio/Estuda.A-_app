@@ -189,7 +189,21 @@ function App() {
 
             const finalUsers = Array.from(mergedMapped.values())
             console.log('Usuários consolidados:', finalUsers.length)
-            setUsersList(finalUsers)
+            
+            // Garantir que temos algo se dbProfiles veio mas Edge falhou
+            if (finalUsers.length === 0 && dbProfiles && dbProfiles.length > 0) {
+                const fallbackUsers = dbProfiles.map(p => ({
+                    id: p.id,
+                    email: p.email,
+                    name: p.name || 'Sem Nome',
+                    role: p.user_role,
+                    created_at: p.created_at,
+                    source: 'db-fallback'
+                }))
+                setUsersList(fallbackUsers)
+            } else {
+                setUsersList(finalUsers)
+            }
         } catch (err) {
             console.error('Erro geral ao buscar lista de usuários:', err)
         } finally {
@@ -1279,6 +1293,21 @@ function App() {
                         ) : (
                             /* Modo Chat WhatsApp */
                             <div className="flex-1 flex flex-col bg-estuda-surface border-x border-estuda-primary/10 overflow-hidden relative">
+                                {/* Cabeçalho do Chat com Anotações do Professor */}
+                                {selectedSubject?.professor_notes && (
+                                    <div className="bg-estuda-bg/80 backdrop-blur-md border-b border-estuda-primary/10 p-3 flex items-start gap-3 animate-fade-in relative z-10">
+                                        <div className="shrink-0 p-2 rounded-xl bg-estuda-primary/10 text-estuda-primary mt-1">
+                                            <Sparkles size={16} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-estuda-primary opacity-70 mb-0.5">Anotações Importantes do Professor</p>
+                                            <p className="text-[11px] font-bold text-white/90 leading-relaxed italic">
+                                                "{selectedSubject.professor_notes}"
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Área de Mensagens */}
                                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-4 custom-scrollbar bg-estuda-bg/50">
                                     {messages.length === 0 ? (
@@ -1287,34 +1316,20 @@ function App() {
                                             <h3 className="text-xl font-bold">Inicie um papo com o Prof. Virtual</h3>
                                             <p className="text-sm font-medium max-w-xs mx-auto">Tire dúvidas sobre seus arquivos de {selectedSubject?.name} agora mesmo.</p>
                                             
-                                            {/* Exibição de Anotações do Professor para o Aluno */}
-                                            {selectedSubject?.professor_notes && (
-                                                <div className="mt-6 p-5 rounded-3xl bg-estuda-primary/10 border border-estuda-primary/20 text-left w-full max-w-lg mx-auto animate-fade-in">
-                                                    <div className="flex items-center gap-2 mb-2 text-estuda-primary">
-                                                        <Sparkles size={16} />
-                                                        <span className="text-[10px] font-black uppercase tracking-widest">Anotações do Professor</span>
-                                                    </div>
-                                                    <p className="text-xs font-medium text-white/80 leading-relaxed italic">
-                                                        "{selectedSubject.professor_notes}"
-                                                    </p>
-                                                </div>
-                                            )}
-
                                             {/* Lista de Materiais Ativos para o Aluno */}
                                             {files.length > 0 && (
                                                 <div className="mt-6 w-full max-w-lg mx-auto">
                                                     <h4 className="text-[10px] font-black uppercase tracking-widest opacity-30 mb-3 text-center">Materiais de Apoio ({files.length})</h4>
                                                     <div className="flex flex-wrap justify-center gap-2">
                                                         {files.map(f => (
-                                                            <div key={f.id} className="bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl flex items-center gap-2">
+                                                            <div key={f.id} className="bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl flex items-center gap-2" title={f.name}>
                                                                 <FileText size={12} className="text-estuda-primary" />
-                                                                <span className="text-[10px] font-bold text-white/60">{f.name}</span>
+                                                                <span className="text-[10px] font-bold text-white/60 truncate max-w-[150px]">{f.name}</span>
                                                             </div>
                                                         ))}
                                                     </div>
                                                 </div>
                                             )}
-
                                         </div>
                                     ) : (
                                         messages.map((msg, idx) => (
@@ -1573,19 +1588,29 @@ function App() {
                             <div className="px-6 pb-6">
                                 {/* Avatar */}
                                 <div className="flex items-end justify-between -mt-10 mb-8">
-                                    <label className="cursor-pointer group relative">
-                                        {perfilDraft.avatar ? (
-                                            <img src={perfilDraft.avatar} alt="avatar" className="w-24 h-24 rounded-3xl border-4 border-estuda-surface object-cover shadow-xl" />
-                                        ) : (
-                                            <div className="w-24 h-24 rounded-3xl border-4 border-estuda-surface bg-estuda-primary/20 flex items-center justify-center shadow-xl">
-                                                <User size={40} className="text-estuda-primary" />
+                                    <div className="flex items-end gap-4">
+                                        <label className="cursor-pointer group relative">
+                                            {perfilDraft.avatar ? (
+                                                <img src={perfilDraft.avatar} alt="avatar" className="w-24 h-24 rounded-3xl border-4 border-estuda-surface object-cover shadow-xl" />
+                                            ) : (
+                                                <div className="w-24 h-24 rounded-3xl border-4 border-estuda-surface bg-estuda-primary/20 flex items-center justify-center shadow-xl">
+                                                    <User size={40} className="text-estuda-primary" />
+                                                </div>
+                                            )}
+                                            <div className="absolute -bottom-1 -right-1 bg-estuda-primary rounded-xl p-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Upload size={12} className="text-white" />
                                             </div>
-                                        )}
-                                        <div className="absolute -bottom-1 -right-1 bg-estuda-primary rounded-xl p-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Upload size={12} className="text-white" />
-                                        </div>
-                                        <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
-                                    </label>
+                                            <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+                                        </label>
+                                        <button 
+                                            onClick={deleteOwnAccount}
+                                            className="p-3 bg-red-500/10 text-red-500 rounded-2xl border border-red-500/20 hover:bg-red-500/20 transition-all shadow-lg group relative"
+                                            title="Excluir Minha Conta Permanentemente"
+                                        >
+                                            <Settings size={20} className="group-hover:rotate-90 transition-transform duration-500" />
+                                            <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black text-white text-[8px] font-black px-2 py-1 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none uppercase tracking-widest border border-white/10">Excluir Conta</span>
+                                        </button>
+                                    </div>
                                     <div className="flex gap-2 mb-2">
                                         <button
                                             onClick={handleSavePerfil}
@@ -1672,7 +1697,7 @@ function App() {
                                 <div className="relative shrink-0">
                                     <div className="absolute inset-0 bg-estuda-primary blur-2xl opacity-10 rounded-full" />
                                     <img 
-                                        src="https://www.gravatar.com/avatar/cedf2434de54e58a0e2a9693e5077464?s=400&d=mp" 
+                                        src="https://www.gravatar.com/avatar/bf8858e8b091f86641e06dc77196237c?s=400&d=mp" 
                                         alt="Arlei Silvério" 
                                         className="size-24 rounded-3xl border-4 border-estuda-surface object-cover relative z-10 shadow-xl"
                                     />
@@ -1975,7 +2000,7 @@ function App() {
                         onClick={() => { setActiveTab(item.id); setSelectedSubject(null); setQuizMode(false); }}
                         className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 rounded-full transition-all ${activeTab === item.id ? 'bg-estuda-primary text-white shadow-lg' : 'text-estuda-secondary hover:bg-estuda-primary/5'}`}
                     >
-                        <item.icon size={16} />
+                        <item.icon size={16} className={activeTab === item.id ? 'text-white' : 'text-yellow-400'} />
                         <span className="text-[7px] font-black uppercase tracking-tighter text-center">{item.label}</span>
                     </button>
                 ))}
