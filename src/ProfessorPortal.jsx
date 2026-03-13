@@ -15,7 +15,8 @@ import {
     User,
     Camera,
     Book,
-    Mail
+    Mail,
+    FileQuestion
 } from 'lucide-react'
 
 export default function ProfessorPortal({ session, onLogout }) {

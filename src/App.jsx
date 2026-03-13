@@ -51,6 +51,52 @@ const AppLogo = ({ className = "size-9 sm:size-11" }) => (
     </div>
 )
 
+class ErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props)
+        this.state = { hasError: false, error: null }
+    }
+    static getDerivedStateFromError(error) {
+        return { hasError: true, error }
+    }
+    componentDidCatch(error, errorInfo) {
+        console.error("ErrorBoundary caught an error", error, errorInfo)
+    }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="min-h-screen bg-estuda-bg flex flex-col items-center justify-center p-6 text-center">
+                    <div className="size-20 bg-red-500/10 rounded-full flex items-center justify-center mb-6 border border-red-500/20">
+                        <LogOut className="text-red-500" size={40} />
+                    </div>
+                    <h2 className="text-2xl font-black text-white mb-2">Ops! Algo deu errado.</h2>
+                    <p className="text-sm text-white/40 font-medium max-w-xs mb-8">
+                        Ocorreu um erro inesperado na interface. Tente recarregar a página ou deslogar.
+                    </p>
+                    <div className="flex gap-4">
+                        <button 
+                            onClick={() => window.location.reload()}
+                            className="bg-estuda-primary text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl shadow-estuda-primary/20 hover:scale-105 active:scale-95 transition-all"
+                        >
+                            Recarregar Página
+                        </button>
+                        <button 
+                            onClick={async () => {
+                                await supabase.auth.signOut()
+                                window.location.href = '/'
+                            }}
+                            className="bg-white/5 text-white/60 px-8 py-4 rounded-2xl font-black text-sm border border-white/10 hover:bg-white/10 transition-all"
+                        >
+                            Sair da Conta
+                        </button>
+                    </div>
+                </div>
+            )
+        }
+        return this.props.children
+    }
+}
+
 function App() {
     const [session, setSession] = useState(undefined) // undefined = loading, null = no session
     const [query, setQuery] = useState('')
@@ -1859,7 +1905,22 @@ function App() {
                                     </button>
                                 </div>
 
-                                {isManagingUsers ? (
+                                    {/* Contador de Usuários Moderno */}
+                                    <div className="flex items-center justify-between bg-yellow-500/5 border border-yellow-500/10 p-5 rounded-[2rem] mb-6">
+                                        <div className="flex items-center gap-4">
+                                            <div className="size-12 rounded-[1.25rem] bg-yellow-500 flex items-center justify-center text-black shadow-lg shadow-yellow-500/20">
+                                                <Users size={24} />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-black text-white leading-none mb-1">Total de Acadêmicos</h4>
+                                                <p className="text-[10px] text-yellow-500/60 font-bold uppercase tracking-widest">Base de Dados Estuda Aí</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-3xl font-black text-white tabular-nums">
+                                            {usersList.length}
+                                        </div>
+                                    </div>
+
                                     <div className="flex flex-col gap-4 animate-fade-in max-h-[400px] overflow-y-auto pr-2 custom-scrollbar scroll-smooth">
                                         {loading && usersList.length === 0 ? (
                                             <div className="flex flex-col items-center justify-center py-8 gap-3">
@@ -1871,19 +1932,32 @@ function App() {
                                         ) : (
                                             usersList.map(u => (
                                                 <div key={u.id} className="flex items-center justify-between bg-estuda-bg/50 p-4 rounded-2xl border border-white/5 group hover:border-yellow-500/40 transition-all">
-                                                    <div className="flex flex-col min-w-0">
-                                                        <span className="text-xs font-black text-white truncate">{u.name}</span>
-                                                        <span className="text-[10px] font-bold text-white/40 truncate">{u.email}</span>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${u.role === 'admin' ? 'bg-red-500/20 text-red-400' : u.role === 'professor' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>
-                                                                {u.role}
-                                                            </span>
-                                                            <span className="text-[8px] opacity-20 font-bold text-white">Criado em {new Date(u.created_at).toLocaleDateString()}</span>
+                                                    <div className="flex items-center gap-4 min-w-0">
+                                                        <div className="size-10 rounded-2xl bg-estuda-primary/10 flex items-center justify-center border border-estuda-primary/10 overflow-hidden shrink-0">
+                                                            {u.avatar_url ? (
+                                                                <img src={u.avatar_url} alt="" className="size-full object-cover" />
+                                                            ) : (
+                                                                <User size={18} className="text-estuda-primary" />
+                                                            )}
+                                                        </div>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-black text-white truncate">{u.name || 'Sem Nome'}</span>
+                                                                {u.role === 'admin' && (
+                                                                    <span className="text-[8px] font-black uppercase tracking-tighter bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded-md border border-yellow-500/20 shrink-0">ADM</span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 ${u.role === 'admin' ? 'bg-red-500/20 text-red-400' : u.role === 'professor' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>
+                                                                    {u.role || 'estudante'}
+                                                                </span>
+                                                                <span className="text-[8px] opacity-20 font-bold text-white whitespace-nowrap">Desde {u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '---'}</span>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    {u.email !== 'arlei85@hotmail.com' && (
+                                                    {u.email !== 'arlei85@hotmail.com' && isSuperAdmin && (
                                                         <button 
-                                                            onClick={() => deleteUser(u.id, u.email)}
+                                                            onClick={() => deleteUser(u.id, u.name || u.email)}
                                                             className="p-2 text-red-400 opacity-40 group-hover:opacity-100 transition-all hover:bg-red-400/10 rounded-xl"
                                                             title="Excluir Usuário"
                                                         >
