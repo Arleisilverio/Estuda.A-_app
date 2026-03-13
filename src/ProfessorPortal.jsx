@@ -36,6 +36,13 @@ export default function ProfessorPortal({ session, onLogout }) {
     const [onboardingAvatar, setOnboardingAvatar] = useState(null)
     const [professorInfo, setProfessorInfo] = useState({ name: '', avatar: null })
 
+    // Estado para Gestão de Provas e Anotações
+    const [showExamForm, setShowExamForm] = useState(false)
+    const [newExam, setNewExam] = useState({ title: '', subject: '', subtitle: '', date: '', time: '' })
+    const [professorNote, setProfessorNote] = useState('')
+    const [savingNote, setSavingNote] = useState(false)
+
+
     useEffect(() => {
         if (session) {
             fetchProfessorData()
@@ -96,6 +103,58 @@ export default function ProfessorPortal({ session, onLogout }) {
             }
         } catch (err) {
             console.error('Erro ao buscar dados do professor:', err)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        if (selectedSubject) {
+            setProfessorNote(selectedSubject.professor_notes || '')
+        }
+    }, [selectedSubject])
+
+    const handleUpdateNote = async () => {
+        if (!selectedSubject) return
+        setSavingNote(true)
+        try {
+            const { error } = await supabase
+                .from('subjects')
+                .update({ professor_notes: professorNote })
+                .eq('id', selectedSubject.id)
+            
+            if (error) throw error
+            alert('Anotações atualizadas com sucesso!')
+            
+            // Atualizar estado local das matérias
+            setSubjects(prev => prev.map(s => s.id === selectedSubject.id ? { ...s, professor_notes: professorNote } : s))
+            setSelectedSubject(prev => ({ ...prev, professor_notes: professorNote }))
+        } catch (err) {
+            alert('Erro ao salvar anotação: ' + err.message)
+        } finally {
+            setSavingNote(false)
+        }
+    }
+
+    const handleAddExam = async (e) => {
+        e.preventDefault()
+        setLoading(true)
+        try {
+            const { error } = await supabase.from('exams').insert({
+                title: newExam.title,
+                subject: newExam.subject,
+                subtitle: newExam.subtitle,
+                date: newExam.date,
+                time: newExam.time,
+                user_id: session.user.id
+            })
+
+            if (error) throw error
+            alert('Prova agendada com sucesso!')
+            setShowExamForm(false)
+            setNewExam({ title: '', subject: '', subtitle: '', date: '', time: '' })
+        } catch (err) {
+            alert('Erro ao agendar prova: ' + err.message)
         } finally {
             setLoading(false)
         }
@@ -416,7 +475,38 @@ export default function ProfessorPortal({ session, onLogout }) {
                             </div>
                         </div>
                     </div>
+                    {/* Anotações do Professor */}
+                    <div className="bg-estuda-surface border border-estuda-primary/10 rounded-[2rem] p-6 shadow-lg">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-black uppercase tracking-widest opacity-50 pl-1">Anotações para Alunos</h3>
+                            <button 
+                                onClick={handleUpdateNote}
+                                disabled={savingNote || !selectedSubject}
+                                className="text-[10px] font-black uppercase text-estuda-primary hover:underline disabled:opacity-30"
+                            >
+                                {savingNote ? 'Salvando...' : 'Salvar'}
+                            </button>
+                        </div>
+                        <textarea
+                            value={professorNote}
+                            onChange={e => setProfessorNote(e.target.value)}
+                            placeholder="Anote aqui pontos importantes da sua matéria que os alunos devem focar..."
+                            className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl p-4 text-xs font-medium focus:outline-none focus:border-estuda-primary/50 transition-colors placeholder:text-white/20 text-white min-h-[120px] resize-none"
+                        />
+                    </div>
+
+                    {/* Botão Agendar Prova */}
+                    <button
+                        onClick={() => {
+                            setNewExam({ ...newExam, subject: selectedSubject?.name || '' })
+                            setShowExamForm(true)
+                        }}
+                        className="w-full bg-estuda-primary text-white p-5 rounded-[2rem] font-black text-sm hover:scale-105 active:scale-95 transition-all shadow-xl shadow-estuda-primary/20 flex items-center justify-center gap-3"
+                    >
+                        <Calendar size={20} /> Agendar Nova Prova
+                    </button>
                 </div>
+
 
                 {/* Coluna Direita: Chat de Validação */}
                 <div className="lg:col-span-8 flex flex-col bg-estuda-surface border border-estuda-primary/10 rounded-[2.5rem] shadow-2xl overflow-hidden min-h-[600px]">
@@ -545,6 +635,89 @@ export default function ProfessorPortal({ session, onLogout }) {
                     </div>
                 </div>
             )}
+            {/* Modal de Agendamento de Prova */}
+            {showExamForm && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowExamForm(false)}></div>
+                    <div className="bg-estuda-surface border border-estuda-primary/20 p-8 rounded-[2.5rem] shadow-2xl w-full max-w-md relative z-10 animate-fade-in flex flex-col overflow-y-auto" style={{ maxHeight: '90vh' }}>
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-2xl font-black text-white flex items-center gap-2">
+                                <FileQuestion size={24} className="text-estuda-primary" /> Nova Prova
+                            </h3>
+                            <button onClick={() => setShowExamForm(false)} className="p-2 rounded-xl hover:bg-white/5 opacity-50 hover:opacity-100 transition-all font-bold text-sm text-white">✕</button>
+                        </div>
+
+                        <form onSubmit={handleAddExam} className="flex flex-col gap-4">
+                            <div>
+                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Título da Prova *</label>
+                                <input
+                                    required
+                                    type="text"
+                                    placeholder="Ex: P1 — Prova do 1º Bimestre"
+                                    value={newExam.title}
+                                    onChange={e => setNewExam({ ...newExam, title: e.target.value })}
+                                    className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors placeholder:text-white/20 text-white"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Nome da Matéria *</label>
+                                <input
+                                    required
+                                    type="text"
+                                    placeholder="Ex: Direito do Trabalho"
+                                    value={newExam.subject}
+                                    onChange={e => setNewExam({ ...newExam, subject: e.target.value })}
+                                    className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors placeholder:text-white/20 text-white"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">O que vai cair na prova</label>
+                                <textarea
+                                    placeholder="Ex: Contratos de Trabalho (arts. 2–11 CLT), Caps. 1 a 4..."
+                                    value={newExam.subtitle}
+                                    onChange={e => setNewExam({ ...newExam, subtitle: e.target.value })}
+                                    className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors placeholder:text-white/20 text-white min-h-[100px] resize-y"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Data *</label>
+                                    <input
+                                        required
+                                        type="date"
+                                        value={newExam.date}
+                                        onChange={e => setNewExam({ ...newExam, date: e.target.value })}
+                                        className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors text-white [color-scheme:dark]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Hora *</label>
+                                    <input
+                                        required
+                                        type="time"
+                                        value={newExam.time}
+                                        onChange={e => setNewExam({ ...newExam, time: e.target.value })}
+                                        className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors text-white [color-scheme:dark]"
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                disabled={loading}
+                                type="submit"
+                                className="w-full bg-estuda-primary text-white py-4 rounded-2xl font-black text-sm mt-4 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-estuda-primary/20 disabled:opacity-50"
+                            >
+                                {loading ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
+                                Agendar Prova
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
+

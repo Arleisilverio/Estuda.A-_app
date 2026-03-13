@@ -132,29 +132,66 @@ function App() {
         setLoading(true)
         try {
             console.log('Buscando lista de usuários...')
-            const { data, error } = await supabase.functions.invoke('user-management', {
-                body: { action: 'list' }
-            })
             
-            if (error) {
-                console.error('Erro na função user-management:', error)
-                // Fallback: Tentar buscar diretamente da tabela de perfis se a função falhar
-                const { data: profiles, error: pError } = await supabase
-                    .from('profiles')
-                    .select('id, name, email')
-                
-                if (!pError && profiles) {
-                    setUsersList(profiles)
-                }
-                return
+            // 1. Buscar todos os perfis do banco de dados (o banco é a fonte da verdade para dados exibidos)
+            const { data: dbProfiles, error: dbError } = await supabase
+                .from('profiles')
+                .select('id, name, email, user_role, created_at')
+                .order('created_at', { ascending: false })
+
+            if (dbError) {
+                console.error('Erro ao buscar perfis do banco:', dbError)
             }
 
-            // Normalizar resposta (pode vir como {users: []} ou [])
-            const users = data?.users || (Array.isArray(data) ? data : [])
-            console.log('Usuários recebidos:', users.length)
-            setUsersList(users)
+            // 2. Chamar a Edge Function para pegar dados do Auth (como última data de login, se disponível)
+            let authUsers = []
+            try {
+                const { data: edgeData, error: edgeError } = await supabase.functions.invoke('user-management', {
+                    body: { action: 'list' }
+                })
+                if (!edgeError && edgeData) {
+                    authUsers = edgeData.users || (Array.isArray(edgeData) ? edgeData : [])
+                }
+            } catch (efErr) {
+                console.warn('Edge function user-management falhou, usando apenas banco de dados:', efErr)
+            }
+
+            // 3. Mesclar dados
+            // Priorizamos os perfis (quem já entrou no app), mas podemos achar e-mails do auth que não tem perfil ainda
+            const mergedMapped = new Map()
+
+            // Adiciona usuários do Auth primeiro
+            authUsers.forEach(u => {
+                mergedMapped.set(u.id || u.email, {
+                    id: u.id,
+                    email: u.email,
+                    name: u.name || 'Usuário Auth',
+                    last_login: u.last_sign_in_at,
+                    source: 'auth'
+                })
+            })
+
+            // Sobrescreve/Adiciona com dados do Perfil (que tem nomes reais, roles, etc)
+            if (dbProfiles) {
+                dbProfiles.forEach(p => {
+                    const existing = mergedMapped.get(p.id) || mergedMapped.get(p.email) || {}
+                    mergedMapped.set(p.id, {
+                        ...existing,
+                        id: p.id,
+                        email: p.email,
+                        name: p.name || existing.name || 'Sem Nome',
+                        role: p.user_role,
+                        created_at: p.created_at,
+                        source: 'db'
+                    })
+                })
+            }
+
+            const finalUsers = Array.from(mergedMapped.values())
+            console.log('Usuários consolidados:', finalUsers.length)
+            setUsersList(finalUsers)
         } catch (err) {
-            console.error('Erro ao buscar lista de usuários:', err)
+            console.error('Erro geral ao buscar lista de usuários:', err)
         } finally {
             setLoading(false)
         }
@@ -344,7 +381,12 @@ function App() {
                 .select('*')
                 .order('name')
             if (error) throw error
-            if (data) setSubjects(data.map(s => ({ id: s.id, name: s.name, icon: s.icon_name })))
+            if (data) setSubjects(data.map(s => ({ 
+                id: s.id, 
+                name: s.name, 
+                icon: s.icon_name,
+                professor_notes: s.professor_notes // Novo campo para anotações do professor
+            })))
         } catch (e) {
             console.error('Erro ao buscar matérias:', e)
         }
@@ -1244,6 +1286,35 @@ function App() {
                                             <MessageSquare size={64} className="mb-4" />
                                             <h3 className="text-xl font-bold">Inicie um papo com o Prof. Virtual</h3>
                                             <p className="text-sm font-medium max-w-xs mx-auto">Tire dúvidas sobre seus arquivos de {selectedSubject?.name} agora mesmo.</p>
+                                            
+                                            {/* Exibição de Anotações do Professor para o Aluno */}
+                                            {selectedSubject?.professor_notes && (
+                                                <div className="mt-6 p-5 rounded-3xl bg-estuda-primary/10 border border-estuda-primary/20 text-left w-full max-w-lg mx-auto animate-fade-in">
+                                                    <div className="flex items-center gap-2 mb-2 text-estuda-primary">
+                                                        <Sparkles size={16} />
+                                                        <span className="text-[10px] font-black uppercase tracking-widest">Anotações do Professor</span>
+                                                    </div>
+                                                    <p className="text-xs font-medium text-white/80 leading-relaxed italic">
+                                                        "{selectedSubject.professor_notes}"
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {/* Lista de Materiais Ativos para o Aluno */}
+                                            {files.length > 0 && (
+                                                <div className="mt-6 w-full max-w-lg mx-auto">
+                                                    <h4 className="text-[10px] font-black uppercase tracking-widest opacity-30 mb-3 text-center">Materiais de Apoio ({files.length})</h4>
+                                                    <div className="flex flex-wrap justify-center gap-2">
+                                                        {files.map(f => (
+                                                            <div key={f.id} className="bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl flex items-center gap-2">
+                                                                <FileText size={12} className="text-estuda-primary" />
+                                                                <span className="text-[10px] font-bold text-white/60">{f.name}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
                                         </div>
                                     ) : (
                                         messages.map((msg, idx) => (
