@@ -5,6 +5,7 @@ import {
     FileText, 
     MessageSquare, 
     Layers, 
+    ChevronLeft,
     ChevronRight, 
     CheckCircle, 
     Loader2, 
@@ -21,7 +22,7 @@ import {
     Plus
 } from 'lucide-react'
 
-export default function ProfessorPortal({ session, onLogout }) {
+export default function ProfessorPortal({ session, onLogout, isAdmin, setViewingProfessorPortal }) {
     const [subjects, setSubjects] = useState([])
     const [selectedSubject, setSelectedSubject] = useState(null)
     const [documents, setDocuments] = useState([])
@@ -43,6 +44,7 @@ export default function ProfessorPortal({ session, onLogout }) {
     const [newExam, setNewExam] = useState({ title: '', subject: '', subtitle: '', date: '', time: '' })
     const [professorNote, setProfessorNote] = useState('')
     const [savingNote, setSavingNote] = useState(false)
+    const [exams, setExams] = useState([])
 
 
     useEffect(() => {
@@ -54,6 +56,7 @@ export default function ProfessorPortal({ session, onLogout }) {
     useEffect(() => {
         if (selectedSubject) {
             fetchDocuments()
+            fetchExams()
             
             // Se inscrever para mudanças em tempo real na tabela de documentos
             const channel = supabase
@@ -155,6 +158,7 @@ export default function ProfessorPortal({ session, onLogout }) {
             alert('Prova agendada com sucesso!')
             setShowExamForm(false)
             setNewExam({ title: '', subject: '', subtitle: '', date: '', time: '' })
+            fetchExams() // Refresh list
         } catch (err) {
             alert('Erro ao agendar prova: ' + err.message)
         } finally {
@@ -187,13 +191,28 @@ export default function ProfessorPortal({ session, onLogout }) {
         }
     }
 
+    const fetchExams = async () => {
+        if (!selectedSubject) return
+        try {
+            const { data, error } = await supabase
+                .from('exams')
+                .select('*')
+                .eq('subject', selectedSubject.name)
+                .order('date', { ascending: true })
+            
+            if (!error && data) setExams(data)
+        } catch (err) {
+            console.error('Erro ao buscar provas:', err)
+        }
+    }
+
     const fetchDocuments = async () => {
         if (!selectedSubject) return
         const { data, error } = await supabase
             .from('documents')
             .select('*')
             .eq('subject_id', selectedSubject.id)
-            .order('created_at', { ascending: false })
+            .order('name', { ascending: true })
         
         if (!error && data) setDocuments(data)
     }
@@ -365,6 +384,14 @@ export default function ProfessorPortal({ session, onLogout }) {
 
     return (
         <div className="min-h-screen bg-estuda-bg text-white flex flex-col pt-20 pb-10 px-4 sm:px-10">
+            {/* Logo Fixa Topo */}
+            <div className="fixed top-6 left-6 z-50 animate-fade-in h-10 w-10 overflow-hidden rounded-xl border border-white/10 shadow-xl bg-white flex items-center justify-center">
+                <img 
+                    src="https://i.supaimg.com/ab10c538-a9f0-4a7a-9c0d-5a65ded30e00/a022583e-d218-4eac-b41f-63e9255e4177.jpg" 
+                    alt="Logo" 
+                    className="w-full h-full object-cover"
+                />
+            </div>
             {/* Header Portal */}
             <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-6 bg-estuda-surface p-6 rounded-[2.5rem] border border-estuda-primary/10 shadow-lg">
                 <div className="flex items-center gap-5">
@@ -404,12 +431,22 @@ export default function ProfessorPortal({ session, onLogout }) {
                             <span className="text-[10px] font-black text-emerald-500 uppercase">IA Ativa</span>
                         </div>
                     </div>
-                    <button 
-                        onClick={onLogout}
-                        className="bg-red-500/5 hover:bg-red-500/10 text-red-400 px-5 py-2.5 rounded-2xl transition-all flex items-center gap-2 font-black text-[10px] uppercase tracking-widest border border-red-500/10"
-                    >
-                        <LogOut size={16} /> Sair
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {isAdmin && (
+                            <button 
+                                onClick={() => setViewingProfessorPortal(false)}
+                                className="bg-white/5 hover:bg-white/10 text-white px-5 py-2.5 rounded-2xl transition-all flex items-center gap-2 font-black text-[10px] uppercase tracking-widest border border-white/10 shadow-lg"
+                            >
+                                <ChevronLeft size={16} /> Voltar ao App
+                            </button>
+                        )}
+                        <button 
+                            onClick={onLogout}
+                            className="bg-red-500/5 hover:bg-red-500/10 text-red-400 px-5 py-2.5 rounded-2xl transition-all flex items-center gap-2 font-black text-[10px] uppercase tracking-widest border border-red-500/10"
+                        >
+                            <LogOut size={16} /> Sair
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -486,6 +523,44 @@ export default function ProfessorPortal({ session, onLogout }) {
                     >
                         <Calendar size={20} /> Agendar Nova Prova
                     </button>
+
+                    {/* Lista de Provas Agendadas pelo Professor */}
+                    <div className="bg-estuda-surface border border-estuda-primary/10 rounded-[2rem] p-6 shadow-lg">
+                        <h3 className="text-sm font-black uppercase tracking-widest opacity-50 mb-4 pl-1">Provas Agendadas</h3>
+                        <div className="flex flex-col gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                            {exams.length === 0 ? (
+                                <p className="text-[10px] text-center opacity-30 italic py-4">Nenhuma prova agendada para esta matéria</p>
+                            ) : (
+                                exams.map(exam => (
+                                    <div key={exam.id} className="bg-estuda-bg p-4 rounded-2xl border border-white/5 relative group">
+                                        <div className="flex items-start gap-3">
+                                            <div className="size-10 rounded-xl bg-estuda-primary/10 flex flex-col items-center justify-center text-estuda-primary shrink-0 border border-estuda-primary/10">
+                                                <span className="text-[8px] font-black uppercase leading-none">{new Date(exam.date + 'T00:00:00').toLocaleDateString('pt-BR', { month: 'short' })}</span>
+                                                <span className="text-sm font-black leading-none">{exam.date.split('-')[2]}</span>
+                                            </div>
+                                            <div className="overflow-hidden">
+                                                <h4 className="text-[11px] font-black leading-tight truncate">{exam.title}</h4>
+                                                <span className="text-[9px] font-bold opacity-40 uppercase tracking-tighter flex items-center gap-1.5 mt-0.5">
+                                                    <Clock size={8} /> {exam.time.substring(0, 5)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={async () => {
+                                                if (window.confirm('Excluir este agendamento?')) {
+                                                    const { error } = await supabase.from('exams').delete().eq('id', exam.id)
+                                                    if (!error) fetchExams()
+                                                }
+                                            }}
+                                            className="absolute top-2 right-2 p-1.5 text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/10 rounded-lg"
+                                        >
+                                            <Trash2 size={12} />
+                                        </button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
                 </div>
 
 

@@ -3,14 +3,12 @@ import { supabase } from './lib/supabase'
 import { Mail, Lock, Eye, EyeOff, Loader2, GraduationCap } from 'lucide-react'
 
 const AppLogo = () => (
-    <div className="size-14 relative flex items-center justify-center bg-[#4A90E2] rounded-[30%] shadow-2xl shadow-[#4A90E2]/40 border-2 border-white/10">
-        <svg viewBox="0 0 24 24" className="w-[60%] h-[60%] text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M16 11c0-3.5-2.5-5.5-5.5-5.5S5 7.5 5 11c0 3 2.5 5 5.5 5h2" />
-            <path d="M16 11h3l2 1-2 1h-3" />
-            <circle cx="11.5" cy="9.5" r="0.8" fill="currentColor" stroke="none" />
-            <path d="M9 16v3" />
-            <path d="M12 16v3" />
-        </svg>
+    <div className="size-20 relative flex items-center justify-center bg-white rounded-[30%] shadow-2xl shadow-blue-500/20 border-2 border-white/10 overflow-hidden mb-2">
+        <img 
+            src="https://i.supaimg.com/ab10c538-a9f0-4a7a-9c0d-5a65ded30e00/a022583e-d218-4eac-b41f-63e9255e4177.jpg" 
+            alt="Estuda Aí Logo" 
+            className="w-full h-full object-cover"
+        />
     </div>
 )
 
@@ -66,17 +64,8 @@ export default function Login() {
             </div>
 
             <div className="w-full max-w-sm relative z-10 animate-fade-in">
-                {/* Logo e título */}
-                <div className="flex flex-col items-center gap-4 mb-10">
+                <div className="flex flex-col items-center gap-4 mb-2">
                     <AppLogo />
-                    <div className="text-center">
-                        <h1 className="text-2xl font-black tracking-tight text-white">
-                            Estuda <span className="text-estuda-primary">Aí</span>
-                        </h1>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-estuda-secondary mt-1">
-                            Caminho para o Sucesso
-                        </p>
-                    </div>
                 </div>
 
                 {/* Card */}

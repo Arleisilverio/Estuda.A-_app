@@ -38,18 +38,16 @@ const CAROUSEL_IMAGES = [
     "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?q=80&w=1600&auto=format&fit=crop"
 ]
 
-const AppLogo = ({ className = "size-9 sm:size-11" }) => (
-    <div className={`${className} relative flex items-center justify-center bg-[#4A90E2] rounded-[30%] shadow-lg shadow-[#4A90E2]/20 transition-all duration-300 border-2 border-white/10`}>
-        <svg viewBox="0 0 24 24" className="w-[60%] h-[60%] text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            {/* O Passarinho Original Estuda Aí - Traçado Simples e Fiel */}
-            <path d="M16 11c0-3.5-2.5-5.5-5.5-5.5S5 7.5 5 11c0 3 2.5 5 5.5 5h2" />
-            <path d="M16 11h3l2 1-2 1h-3" />
-            <circle cx="11.5" cy="9.5" r="0.8" fill="currentColor" stroke="none" />
-            <path d="M9 16v3" />
-            <path d="M12 16v3" />
-        </svg>
+const AppLogo = ({ className = "size-14" }) => (
+    <div className={`${className} relative flex items-center justify-center bg-white rounded-[30%] shadow-2xl shadow-blue-500/20 border-2 border-white/10 overflow-hidden`}>
+        <img 
+            src="https://i.supaimg.com/ab10c538-a9f0-4a7a-9c0d-5a65ded30e00/a022583e-d218-4eac-b41f-63e9255e4177.jpg" 
+            alt="Estuda Aí Logo" 
+            className="w-full h-full object-cover"
+        />
     </div>
 )
+
 
 class ErrorBoundary extends React.Component {
     constructor(props) {
@@ -109,7 +107,7 @@ function App() {
     // Estado de Navegação e Contexto
     const [activeTab, setActiveTab] = useState('estudo') // estudo, perfil, provas, grade
     const [selectedSubject, setSelectedSubject] = useState(null)
-    const [userRole, setUserRole] = useState('student') // student, professor, admin
+    const [userRole, setUserRole] = useState(null) // student, professor, admin
 
     // Admin check — based on database role
     const isAdmin = userRole === 'admin'
@@ -935,6 +933,22 @@ function App() {
                 <div className="flex flex-col items-center gap-4 opacity-40">
                     <Loader2 size={40} className="animate-spin text-estuda-primary" />
                     <p className="text-xs font-black uppercase tracking-widest">Carregando...</p>
+                </div>
+            </div>
+        )
+    }
+
+    if (session && userRole === null) {
+        return (
+            <div className="min-h-screen bg-estuda-bg flex flex-col items-center justify-center p-6 animate-fade-in">
+                <div className="flex flex-col items-center gap-6">
+                    <AppLogo className="size-24" />
+                    <div className="flex flex-col items-center gap-2">
+                        <Loader2 className="animate-spin text-estuda-primary" size={32} />
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-estuda-secondary animate-pulse">
+                            Preparando seu ambiente...
+                        </p>
+                    </div>
                 </div>
             </div>
         )
