@@ -171,6 +171,25 @@ function App() {
     const [isManagingProfs, setIsManagingProfs] = useState(false)
     const [isManagingUsers, setIsManagingUsers] = useState(false)
     const [usersList, setUsersList] = useState([])
+    const [showDevPopup, setShowDevPopup] = useState(false)
+    const [isNavVisible, setIsNavVisible] = useState(true)
+    const [lastScrollY, setLastScrollY] = useState(0)
+
+    // Efeito para esconder/mostrar menu inferior no scroll
+    useEffect(() => {
+        const handleScroll = () => {
+            const currentScrollY = window.scrollY
+            if (currentScrollY > lastScrollY && currentScrollY > 100) {
+                setIsNavVisible(false) // Sumir ao descer
+            } else {
+                setIsNavVisible(true) // Aparecer ao subir
+            }
+            setLastScrollY(currentScrollY)
+        }
+
+        window.addEventListener('scroll', handleScroll, { passive: true })
+        return () => window.removeEventListener('scroll', handleScroll)
+    }, [lastScrollY])
 
     const fetchUsersList = async () => {
         if (loading) return
@@ -429,6 +448,15 @@ function App() {
         }
     }
 
+    // Função para verificar se a nota do professor ainda é válida (menos de 24h)
+    const isNoteValid = (updatedAt) => {
+        if (!updatedAt) return true; // Fallback se não tiver data (notas antigas)
+        const noteDate = new Date(updatedAt);
+        const now = new Date();
+        const diffInHours = (now - noteDate) / (1000 * 60 * 60);
+        return diffInHours < 24;
+    };
+
     const fetchSubjects = async () => {
         try {
             const { data, error } = await supabase
@@ -626,9 +654,14 @@ function App() {
         setLoading(true)
 
         try {
+            // Reinforce RAG constraints in the query itself to ensure the AI doesn't use external info
+            const ragQuery = `IMPORTANTE: RESPONDA APENAS COM BASE NOS MATERIAIS FORNECIDOS PELO PROFESSOR. NÃO USE SEU CONHECIMENTO PRÉVIO OU INTERNET. SE A INFORMAÇÃO NÃO ESTIVER NOS MATERIAIS, DIGA QUE NÃO ENCONTROU NO CONTEÚDO DA DISCIPLINA.
+
+Pergunta do Aluno: ${query}`;
+
             const { data, error } = await supabase.functions.invoke('ask-ai', {
                 body: {
-                    query: query,
+                    query: ragQuery,
                     subjectId: selectedSubject?.id,
                     messages: messages.slice(-5) // Enviar contexto recente
                 }
@@ -949,6 +982,13 @@ function App() {
                             Preparando seu ambiente...
                         </p>
                     </div>
+                    {/* Botão de segurança para casos de travamento no carregamento de ambiente */}
+                    <button 
+                        onClick={() => window.location.reload()}
+                        className="mt-4 text-[8px] font-black uppercase tracking-widest opacity-20 hover:opacity-100 transition-all"
+                    >
+                        Pressione para Recarregar se demorar
+                    </button>
                 </div>
             </div>
         )
@@ -969,10 +1009,6 @@ function App() {
             <header className="h-16 sm:h-20 px-4 sm:px-12 flex items-center justify-between border-b border-estuda-primary/10 bg-estuda-bg/80 backdrop-blur-xl sticky top-0 z-50">
                 <div className="flex items-center gap-2 sm:gap-3 group">
                     <AppLogo />
-                    <div>
-                        <h1 className="text-base sm:text-lg font-black tracking-tighter leading-none mb-1 text-white">Estuda <span className="text-estuda-primary">Aí</span></h1>
-                        <p className="text-[7px] sm:text-[9px] text-estuda-secondary font-bold uppercase tracking-[0.2em]">Caminho para o Sucesso</p>
-                    </div>
                 </div>
 
                 <div className="flex items-center gap-4">
@@ -1008,10 +1044,16 @@ function App() {
                                     </div>
                                 )}
                                 <button
+                                    onClick={() => { setActiveTab('perfil'); setIsMenuOpen(false); }}
+                                    className="w-full px-4 py-2 flex items-center gap-2 hover:bg-estuda-primary/5 text-sm font-medium"
+                                >
+                                    <User size={16} /> Meu Perfil
+                                </button>
+                                <button
                                     onClick={() => { openPerfilForm(); setIsMenuOpen(false); }}
                                     className="w-full px-4 py-2 flex items-center gap-2 hover:bg-estuda-primary/5 text-sm font-medium"
                                 >
-                                    <Settings size={16} /> Minha Conta
+                                    <Settings size={16} /> Configurações
                                 </button>
                                 <div className="h-px bg-estuda-primary/10 my-1 mx-2"></div>
                                 <button
@@ -1351,7 +1393,7 @@ function App() {
                             /* Modo Chat WhatsApp */
                             <div className="flex-1 flex flex-col bg-estuda-surface border-x border-estuda-primary/10 overflow-hidden relative">
                                 {/* Cabeçalho do Chat com Anotações do Professor */}
-                                {selectedSubject?.professor_notes && (
+                                {selectedSubject?.professor_notes && isNoteValid(selectedSubject.notes_updated_at) && (
                                     <div className="bg-estuda-bg/80 backdrop-blur-md border-b border-estuda-primary/10 p-3 flex items-start gap-3 animate-fade-in relative z-10">
                                         <div className="shrink-0 p-2 rounded-xl bg-estuda-primary/10 text-estuda-primary mt-1">
                                             <Sparkles size={16} />
@@ -1372,6 +1414,21 @@ function App() {
                                             <MessageSquare size={64} className="mb-4" />
                                             <h3 className="text-xl font-bold">Inicie um papo com o Prof. Virtual</h3>
                                             <p className="text-sm font-medium max-w-xs mx-auto">Tire dúvidas sobre seus arquivos de {selectedSubject?.name} agora mesmo.</p>
+
+                                            {/* Notas do Professor para o Aluno */}
+                                            {selectedSubject?.professor_notes && isNoteValid(selectedSubject.notes_updated_at) && (
+                                                <div className="mt-8 p-6 bg-estuda-primary/5 border border-estuda-primary/10 rounded-3xl max-w-lg mx-auto text-left relative overflow-hidden group">
+                                                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
+                                                        <Quote size={40} className="text-estuda-primary" />
+                                                    </div>
+                                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-estuda-primary mb-3 flex items-center gap-2">
+                                                        <Sparkles size={12} /> Nota do Professor
+                                                    </h4>
+                                                    <p className="text-sm text-white/80 font-medium italic leading-relaxed">
+                                                        "{selectedSubject.professor_notes}"
+                                                    </p>
+                                                </div>
+                                            )}
                                             
                                             {/* Lista de Materiais Ativos para o Aluno */}
                                             {files.length > 0 && (
@@ -1458,14 +1515,8 @@ function App() {
                                                     }
                                                 }}
                                                 placeholder="Sua dúvida sobre a matéria..."
-                                                className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl py-3.5 px-5 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-estuda-primary/20 transition-all font-medium placeholder:text-estuda-primary/30 resize-none max-h-32"
+                                                className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl py-3.5 px-5 text-sm focus:outline-none focus:ring-2 focus:ring-estuda-primary/20 transition-all font-medium placeholder:text-estuda-primary/30 resize-none max-h-32"
                                             />
-                                            <button
-                                                className="absolute right-3 bottom-0 top-0 m-auto text-white/40 hover:text-estuda-primary p-1"
-                                                onClick={() => {/* Anexar */ }}
-                                            >
-                                                <Layers size={20} />
-                                            </button>
                                         </div>
                                         <button
                                             onClick={handleAsk}
@@ -1475,7 +1526,6 @@ function App() {
                                             {loading ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
                                         </button>
                                     </div>
-                                    <p className="text-[10px] text-center mt-3 opacity-30 font-bold uppercase tracking-widest">O Professor IA utiliza seus materiais como base de conhecimento</p>
                                 </div>
                             </div>
                         )}
@@ -1486,9 +1536,7 @@ function App() {
                 {activeTab === 'provas' && !selectedSubject && (
                     <section className="animate-fade-in flex flex-col gap-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-xl sm:text-3xl font-bold flex items-center gap-3">
-                                <FileQuestion size={32} className="text-estuda-primary" /> Provas
-                            </h3>
+                            <div />
                             {isAdmin && (
                                 <button
                                     onClick={() => setShowExamForm(true)}
@@ -1744,34 +1792,22 @@ function App() {
                             </div>
                         </div>
 
-                        {/* Seção Sobre o Criador Integrada */}
-                        <div className="bg-estuda-surface p-6 sm:p-8 rounded-[2.5rem] border border-estuda-primary/10 relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-estuda-primary/5 rounded-bl-[5rem] -z-0"></div>
-                            <h3 className="text-lg font-black mb-6 flex items-center gap-3 relative z-10">
-                                <Sparkles size={22} className="text-estuda-primary" /> Sobre o Criador
-                            </h3>
-                            <div className="flex flex-col sm:flex-row items-center gap-6 relative z-10">
-                                <div className="relative shrink-0">
-                                    <div className="absolute inset-0 bg-estuda-primary blur-2xl opacity-10 rounded-full" />
-                                    <img 
-                                        src="https://i.supaimg.com/ab10c538-a9f0-4a7a-9c0d-5a65ded30e00/01193380-dc6a-41e9-835c-5598b06bfeca.jpg" 
-                                        alt="Arlei Silvério" 
-                                        className="size-24 rounded-3xl border-4 border-estuda-surface object-cover relative z-10 shadow-xl"
-                                    />
+                        {/* Botão Sobre o Criador (Refatorado) */}
+                        <button 
+                            onClick={() => setShowDevPopup(true)}
+                            className="w-full bg-estuda-surface p-6 sm:p-8 rounded-[2.5rem] border border-estuda-primary/10 flex items-center justify-between group hover:bg-estuda-primary/5 transition-all text-left"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="size-14 rounded-2xl bg-estuda-primary/10 flex items-center justify-center text-estuda-primary">
+                                    <Sparkles size={24} />
                                 </div>
-                                <div className="flex-1 text-center sm:text-left">
-                                    <h4 className="text-xl font-black text-white">Arlei Silvério</h4>
-                                    <p className="text-estuda-primary font-black text-[9px] uppercase tracking-widest mb-3">Idealizador & Desenvolvedor</p>
-                                    <p className="text-xs leading-relaxed text-white/50 font-medium mb-4 italic">
-                                        "Focado em transformar a educação através da tecnologia e inteligência artificial."
-                                    </p>
-                                    <a href="mailto:arlei85@hotmail.com" className="inline-flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/5 hover:bg-white/10 transition-all">
-                                        <Mail size={14} className="text-estuda-primary" />
-                                        <span className="text-xs font-bold">arlei85@hotmail.com</span>
-                                    </a>
+                                <div>
+                                    <h4 className="text-base font-black text-white">Sobre o Criador</h4>
+                                    <p className="text-[10px] opacity-40 font-black uppercase tracking-widest">Conheça o desenvolvedor do projeto</p>
                                 </div>
                             </div>
-                        </div>
+                            <ChevronRight size={24} className="text-estuda-primary/40 group-hover:translate-x-1 transition-transform" />
+                        </button>
 
                         {/* Botão para Portal do Professor (Somente ADM) */}
                         {isAdmin && (
@@ -2093,12 +2129,11 @@ function App() {
             )}
 
             {/* Floating Bottom Nav */}
-            <nav className="fixed bottom-6 left-4 right-4 max-w-sm mx-auto bg-estuda-surface/80 backdrop-blur-2xl rounded-full shadow-2xl border border-white/5 p-1 flex items-center z-50 animate-fade-in shadow-black/20 px-1">
+            <nav className={`fixed bottom-6 left-4 right-4 max-w-sm mx-auto bg-estuda-surface/80 backdrop-blur-2xl rounded-full shadow-2xl border border-white/5 p-1 flex items-center z-50 transition-all duration-300 ${isNavVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'} shadow-black/20 px-1`}>
                 {[
                     { id: 'estudo', icon: GraduationCap, label: 'Estudo' },
                     { id: 'provas', icon: FileQuestion, label: 'Provas' },
                     { id: 'grade', icon: Calendar, label: 'Grade' },
-                    { id: 'perfil', icon: User, label: 'Perfil' },
                 ].map((item) => (
                     <button
                         key={item.id}
@@ -2338,6 +2373,49 @@ function App() {
                         >
                             FECHAR
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Sobre o Criador (DevPopup) */}
+            {showDevPopup && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowDevPopup(false)}></div>
+                    <div className="bg-estuda-surface border border-estuda-primary/20 p-6 sm:p-10 rounded-[2.5rem] shadow-2xl w-full max-w-lg relative z-10 animate-scale-up flex flex-col items-center">
+                        <button 
+                            onClick={() => setShowDevPopup(false)}
+                            className="absolute top-6 right-6 p-2 rounded-xl hover:bg-white/5 opacity-50 hover:opacity-100 transition-all font-bold text-sm text-white"
+                        >✕</button>
+                        
+                        <div className="relative mb-6">
+                            <div className="absolute inset-0 bg-estuda-primary blur-[40px] opacity-20 rounded-full" />
+                            <img 
+                                src="https://i.supaimg.com/ab10c538-a9f0-4a7a-9c0d-5a65ded30e00/01193380-dc6a-41e9-835c-5598b06bfeca.jpg" 
+                                alt="Arlei Silvério" 
+                                className="size-32 sm:size-40 rounded-[3rem] border-4 border-estuda-surface object-cover relative z-10 shadow-2xl"
+                            />
+                        </div>
+
+                        <h3 className="text-2xl sm:text-3xl font-black text-white mb-1">Arlei Silvério</h3>
+                        <p className="text-estuda-primary font-black text-xs uppercase tracking-[0.2em] mb-6">Idealizador & Desenvolvedor</p>
+                        
+                        <div className="w-full h-px bg-white/10 mb-6" />
+
+                        <p className="text-sm sm:text-base leading-relaxed text-white/70 font-medium mb-8 text-center italic px-4">
+                            "Focado em transformar a educação através da tecnologia e inteligência artificial de ponta."
+                        </p>
+
+                        <div className="flex flex-col sm:flex-row gap-4 w-full">
+                            <a 
+                                href="mailto:arlei85@hotmail.com" 
+                                className="flex-1 inline-flex items-center justify-center gap-3 bg-white/5 px-6 py-4 rounded-2xl border border-white/10 hover:bg-white/10 transition-all group"
+                            >
+                                <Mail size={18} className="text-estuda-primary group-hover:scale-110 transition-transform" />
+                                <span className="text-sm font-bold">arlei85@hotmail.com</span>
+                            </a>
+                        </div>
+                        
+                        <p className="mt-8 text-[9px] font-black uppercase tracking-widest opacity-20">Estuda.A — © 2026 Todos os Direitos Reservados</p>
                     </div>
                 </div>
             )}

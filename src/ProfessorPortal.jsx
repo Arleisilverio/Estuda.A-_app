@@ -19,7 +19,8 @@ import {
     Mail,
     FileQuestion,
     Calendar,
-    Plus
+    Plus,
+    Clock
 } from 'lucide-react'
 
 export default function ProfessorPortal({ session, onLogout, isAdmin, setViewingProfessorPortal }) {
@@ -123,18 +124,22 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
         if (!selectedSubject) return
         setSavingNote(true)
         try {
-            const { error } = await supabase
+            const { error: updateErr } = await supabase
                 .from('subjects')
-                .update({ professor_notes: professorNote })
-                .eq('id', selectedSubject.id)
+                .update({ 
+                    professor_notes: professorNote,
+                    notes_updated_at: new Date().toISOString()
+                })
+                .eq('id', selectedSubject.id);
             
-            if (error) throw error
-            alert('Anotações atualizadas com sucesso!')
+            if (updateErr) throw updateErr
             
-            // Atualizar estado local das matérias
             setSubjects(prev => prev.map(s => s.id === selectedSubject.id ? { ...s, professor_notes: professorNote } : s))
             setSelectedSubject(prev => ({ ...prev, professor_notes: professorNote }))
+
+            alert('Anotações atualizadas com sucesso!')
         } catch (err) {
+            console.error('Erro ao salvar anotação:', err)
             alert('Erro ao salvar anotação: ' + err.message)
         } finally {
             setSavingNote(false)
@@ -247,18 +252,49 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
 
             if (dbError) throw dbError
             
-            fetchDocuments()
-
-            // Disparar o processamento em background (não aguardamos o resultado aqui)
+            // Disparar o processamento em background
             supabase.functions.invoke('process-document', {
                 body: { documentId: docData.id }
             }).catch(e => console.error('Erro ao chamar processamento:', e))
 
             alert('Material enviado com sucesso! O processamento iniciará em breve.')
-        } catch (err) {
-            alert('Erro no upload: ' + err.message)
+            // Pequeno timeout para garantir que o banco processou antes do fetch
+            setTimeout(() => fetchDocuments(), 500)
+        } catch (error) {
+            console.error('Erro no upload:', error)
+            alert('Erro no upload: ' + error.message)
         } finally {
             setUploading(false)
+        }
+    }
+
+    const handleDeleteDocument = async (doc) => {
+        if (!window.confirm(`Tem certeza que deseja excluir o documento "${doc.name}"?`)) return
+        
+        try {
+            setLoading(true)
+            // 1. Deletar do Storage
+            const { error: storageError } = await supabase.storage
+                .from('documents')
+                .remove([doc.file_path])
+
+            if (storageError) console.warn('Erro ao remover do storage (pode já não existir):', storageError)
+
+            // 2. Deletar do Banco de Dados
+            const { error: dbError } = await supabase
+                .from('documents')
+                .delete()
+                .eq('id', doc.id)
+
+            if (dbError) throw dbError
+
+            alert('Documento removido com sucesso!')
+            // Pequeno timeout e refetch agressivo
+            setTimeout(() => fetchDocuments(), 500)
+        } catch (err) {
+            alert('Erro ao excluir documento: ' + err.message)
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -385,12 +421,16 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
     return (
         <div className="min-h-screen bg-estuda-bg text-white flex flex-col pt-20 pb-10 px-4 sm:px-10">
             {/* Logo Fixa Topo */}
-            <div className="fixed top-6 left-6 z-50 animate-fade-in h-10 w-10 overflow-hidden rounded-xl border border-white/10 shadow-xl bg-white flex items-center justify-center">
-                <img 
-                    src="https://i.supaimg.com/ab10c538-a9f0-4a7a-9c0d-5a65ded30e00/a022583e-d218-4eac-b41f-63e9255e4177.jpg" 
-                    alt="Logo" 
-                    className="w-full h-full object-cover"
-                />
+            <div className="fixed top-6 left-6 z-50 animate-fade-in">
+                <div className="flex items-center gap-3">
+                    <div className="size-11 flex items-center justify-center bg-white rounded-xl shadow-lg border border-white/10 overflow-hidden">
+                        <img 
+                            src="https://i.supaimg.com/ab10c538-a9f0-4a7a-9c0d-5a65ded30e00/a022583e-d218-4eac-b41f-63e9255e4177.jpg" 
+                            alt="Estuda Aí Logo" 
+                            className="w-full h-full object-cover"
+                        />
+                    </div>
+                </div>
             </div>
             {/* Header Portal */}
             <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-6 bg-estuda-surface p-6 rounded-[2.5rem] border border-estuda-primary/10 shadow-lg">
@@ -416,10 +456,23 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                             </span>
                         </div>
                         <h1 className="text-xl font-black text-white">{professorInfo.name}</h1>
-                        <p className="text-[10px] font-bold opacity-40 uppercase tracking-tighter flex items-center gap-1.5 mt-0.5">
-                            <Book size={10} className="text-estuda-primary/60" /> 
-                            Lecionando: <span className="text-white/60">{selectedSubject?.name || 'Carregando...'}</span>
-                        </p>
+                        
+                        {/* Seletor de Matérias (Sub-contas) */}
+                        <div className="flex flex-wrap gap-2 mt-3">
+                            {subjects.map(subj => (
+                                <button
+                                    key={subj.id}
+                                    onClick={() => setSelectedSubject(subj)}
+                                    className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${
+                                        selectedSubject?.id === subj.id 
+                                            ? 'bg-estuda-primary text-white border-estuda-primary shadow-lg shadow-estuda-primary/20 scale-105' 
+                                            : 'bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white'
+                                    }`}
+                                >
+                                    {subj.name}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
                 
@@ -499,13 +552,20 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                                     <div key={doc.id} className="flex items-center justify-between bg-estuda-bg p-3 rounded-xl border border-white/5">
                                         <div className="flex items-center gap-3 overflow-hidden">
                                             <FileText size={16} className="text-estuda-primary shrink-0" />
-                                            <span className="text-[10px] font-bold truncate">{doc.name}</span>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-white truncate">{doc.name}</p>
+                                                <p className="text-[10px] opacity-40 font-bold uppercase tracking-widest">
+                                                    {doc.status === 'ready' ? 'Processado' : 'Processando IA...'}
+                                                </p>
+                                            </div>
                                         </div>
-                                        {doc.status === 'ready' ? (
-                                            <CheckCircle size={14} className="text-emerald-500 shrink-0" />
-                                        ) : (
-                                            <Loader2 size={14} className="animate-spin text-estuda-primary shrink-0" />
-                                        )}
+                                        <button
+                                            onClick={() => handleDeleteDocument(doc)}
+                                            className="p-2 text-red-500/40 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                                            title="Excluir Material"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
                                     </div>
                                 ))}
                                 {documents.length === 0 && (
@@ -737,4 +797,3 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
         </div>
     )
 }
-
