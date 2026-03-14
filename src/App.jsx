@@ -144,6 +144,7 @@ function App() {
     const [newSlideUrl, setNewSlideUrl] = useState('')
     const [newSlideCaption, setNewSlideCaption] = useState('')
     const [showAbout, setShowAbout] = useState(false)
+    const [viewingProfessorPortal, setViewingProfessorPortal] = useState(false)
 
     // Estado das Matérias
     const [subjects, setSubjects] = useState([])
@@ -182,8 +183,8 @@ function App() {
             // 1. Buscar todos os perfis do banco de dados (o banco é a fonte da verdade para dados exibidos)
             const { data: dbProfiles, error: dbError } = await supabase
                 .from('profiles')
-                .select('id, name, email, user_role, created_at')
-                .order('created_at', { ascending: false })
+                .select('id, name, user_role')
+                .order('name', { ascending: true })
 
             if (dbError) {
                 console.error('Erro ao buscar perfis do banco:', dbError)
@@ -224,10 +225,8 @@ function App() {
                     mergedMapped.set(p.id, {
                         ...existing,
                         id: p.id,
-                        email: p.email,
                         name: p.name || existing.name || 'Sem Nome',
                         role: p.user_role,
-                        created_at: p.created_at,
                         source: 'db'
                     })
                 })
@@ -240,10 +239,8 @@ function App() {
             if (finalUsers.length === 0 && dbProfiles && dbProfiles.length > 0) {
                 const fallbackUsers = dbProfiles.map(p => ({
                     id: p.id,
-                    email: p.email,
                     name: p.name || 'Sem Nome',
                     role: p.user_role,
-                    created_at: p.created_at,
                     source: 'db-fallback'
                 }))
                 setUsersList(fallbackUsers)
@@ -948,8 +945,8 @@ function App() {
     }
 
     // Redirecionamento para Portal do Professor
-    if (userRole === 'professor') {
-        return <ProfessorPortal session={session} onLogout={() => supabase.auth.signOut()} />
+    if (userRole === 'professor' || (isAdmin && viewingProfessorPortal)) {
+        return <ProfessorPortal session={session} onLogout={() => supabase.auth.signOut()} isAdmin={isAdmin} setViewingProfessorPortal={setViewingProfessorPortal} />
     }
 
     return (
@@ -1762,6 +1759,25 @@ function App() {
                             </div>
                         </div>
 
+                        {/* Botão para Portal do Professor (Somente ADM) */}
+                        {isAdmin && (
+                            <button
+                                onClick={() => setViewingProfessorPortal(true)}
+                                className="w-full mt-6 bg-estuda-primary/10 border border-estuda-primary/20 p-6 rounded-[2.5rem] flex items-center justify-between group hover:bg-estuda-primary/20 transition-all shadow-xl shadow-estuda-primary/5"
+                            >
+                                <div className="flex items-center gap-5">
+                                    <div className="size-14 rounded-[1.5rem] bg-estuda-primary/20 flex items-center justify-center text-estuda-primary shadow-inner">
+                                        <GraduationCap size={28} />
+                                    </div>
+                                    <div className="text-left">
+                                        <h4 className="text-base font-black text-white leading-none mb-1.5">Acessar Portal do Professor</h4>
+                                        <p className="text-[10px] opacity-40 font-black uppercase tracking-widest">Gestão de provas e conteúdos</p>
+                                    </div>
+                                </div>
+                                <ChevronRight size={24} className="text-estuda-primary/40 group-hover:translate-x-1 transition-transform" />
+                            </button>
+                        )}
+
                         {/* Botão Excluir Conta (Auto-exclusão) */}
                         <div className="px-4">
                             <button 
@@ -1952,7 +1968,7 @@ function App() {
                                                                     <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 ${u.role === 'admin' ? 'bg-red-500/20 text-red-400' : u.role === 'professor' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>
                                                                         {u.role || 'estudante'}
                                                                     </span>
-                                                                    <span className="text-[8px] opacity-20 font-bold text-white whitespace-nowrap">Desde {u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '---'}</span>
+                                                                    <span className="text-[8px] opacity-20 font-bold text-white whitespace-nowrap">ID: {u.id.substring(0, 8)}</span>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -2258,7 +2274,59 @@ function App() {
                 </div>
             )}
 
-            {/* Removido Modais de Perfil e Sobre redundantes */}
+            {/* Modal Seleção de Documento para Ações de IA */}
+            {showDocSelect && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowDocSelect(false)}></div>
+                    <div className="bg-estuda-surface border border-estuda-primary/20 p-6 sm:p-8 rounded-[2.5rem] shadow-2xl w-full max-w-sm relative z-10 animate-fade-in flex flex-col overflow-y-auto" style={{ maxHeight: '90vh' }}>
+                        <h3 className="text-xl sm:text-2xl font-black mb-6 text-white flex items-center gap-2">
+                            <Layers size={24} className="text-estuda-primary" /> Selecione o Material
+                        </h3>
+                        
+                        <p className="text-xs font-bold text-white/60 mb-6 px-2">Escolha qual material deve ser a base principal para esta ação ou use todos os documentos do professor.</p>
+
+                        <div className="flex flex-col gap-3">
+                            <button
+                                onClick={() => executePendingAction(pendingAction, '')}
+                                className="w-full flex items-center gap-4 p-4 rounded-2xl bg-estuda-primary/10 border border-estuda-primary/20 hover:bg-estuda-primary/20 transition-all text-left group"
+                            >
+                                <div className="size-10 rounded-xl bg-estuda-primary/20 flex items-center justify-center text-estuda-primary group-hover:scale-110 transition-transform">
+                                    <Sparkles size={20} />
+                                </div>
+                                <div>
+                                    <p className="font-black text-sm text-white">Todos os Materiais</p>
+                                    <p className="text-[10px] uppercase font-bold text-estuda-primary opacity-60">Visão Geral Completa</p>
+                                </div>
+                            </button>
+
+                            <div className="h-px bg-white/5 my-2"></div>
+
+                            {files.map(file => (
+                                <button
+                                    key={file.id}
+                                    onClick={() => executePendingAction(pendingAction, file.id)}
+                                    className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-left group"
+                                >
+                                    <div className="size-10 rounded-xl bg-white/5 flex items-center justify-center text-white/40 group-hover:scale-110 transition-transform">
+                                        <FileText size={20} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-sm text-white truncate">{file.name}</p>
+                                        <p className="text-[10px] uppercase font-bold text-white/30 truncate">Material Específico</p>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+
+                        <button
+                            onClick={() => setShowDocSelect(false)}
+                            className="w-full mt-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-white/40 hover:text-white transition-colors"
+                        >
+                            FECHAR
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <style>{`
                 @keyframes scale-up {
