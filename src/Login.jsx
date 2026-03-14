@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { supabase } from './lib/supabase'
-import { Mail, Lock, Eye, EyeOff, Loader2, GraduationCap } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, Loader2, GraduationCap, Fingerprint } from 'lucide-react'
 
 const AppLogo = () => (
     <div className="size-20 relative flex items-center justify-center bg-white rounded-[30%] shadow-2xl shadow-blue-500/20 border-2 border-white/10 overflow-hidden mb-2">
@@ -12,7 +12,7 @@ const AppLogo = () => (
     </div>
 )
 
-export default function Login() {
+export default function Login({ biometrySupported, onBiometricLogin }) {
     const [mode, setMode] = useState('login') // 'login' | 'register'
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
@@ -176,6 +176,25 @@ export default function Login() {
                             }
                         </button>
                     </form>
+
+                    {mode === 'login' && biometrySupported && (
+                        <div className="mt-4 flex flex-col items-center gap-3">
+                            <div className="w-full flex items-center gap-3 opacity-20">
+                                <div className="h-px flex-1 bg-white" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">ou</span>
+                                <div className="h-px flex-1 bg-white" />
+                            </div>
+                            
+                            <button
+                                type="button"
+                                onClick={onBiometricLogin}
+                                className="w-full py-4 rounded-2xl font-black text-sm bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all flex items-center justify-center gap-3"
+                            >
+                                <Fingerprint size={20} className="text-estuda-primary" />
+                                ACESSO BIOMÉTRICO
+                            </button>
+                        </div>
+                    )}
 
                     {mode === 'login' && (
                         <p className="text-center text-xs opacity-30 font-semibold mt-6">
