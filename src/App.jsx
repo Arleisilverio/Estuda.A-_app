@@ -3,6 +3,7 @@ import { supabase } from './lib/supabase'
 import Login from './Login'
 import GradeHoraria from './GradeHoraria'
 import ProfessorPortal from './ProfessorPortal'
+import AdminDashboard from './AdminDashboard'
 import { isBiometryAvailable, bufferToBase64URL, base64URLToBuffer } from './lib/webauthn_helpers'
 import {
     FileText,
@@ -428,6 +429,16 @@ function App() {
         
         setLoading(true)
         try {
+            // Log deletion for admin stats before wipe
+            await supabase.from('user_activity_logs').insert({
+                user_id: session.user.id,
+                user_name: perfil.nome,
+                user_role: userRole,
+                course: perfil.curso,
+                period: perfil.periodo,
+                event_type: 'deletion'
+            })
+
             const { error } = await supabase.functions.invoke('user-management', {
                 body: { action: 'delete' }
             })
@@ -2147,14 +2158,10 @@ Pergunta do Aluno: ${query}`;
                                         <h3 className="text-lg font-black">Gerenciar Todos os Usuários</h3>
                                     </div>
                                     <button 
-                                        onClick={() => {
-                                            const newState = !isManagingUsers
-                                            setIsManagingUsers(newState)
-                                            if (newState) fetchUsersList()
-                                        }}
+                                        onClick={() => setShowAdminDashboard(true)}
                                         className="text-[10px] font-black uppercase tracking-widest text-yellow-500 hover:underline"
                                     >
-                                        {isManagingUsers ? 'Ocultar Lista' : 'Ver Todos'}
+                                        Acessar Painel Master
                                     </button>
                                 </div>
 
@@ -2646,6 +2653,10 @@ Pergunta do Aluno: ${query}`;
                     animation: scale-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
                 }
             `}</style>
+            {/* Dashboard Master Admin */}
+            {showAdminDashboard && isAdmin && (
+                <AdminDashboard onClose={() => setShowAdminDashboard(false)} />
+            )}
         </div>
     )
 }
