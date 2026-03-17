@@ -25,6 +25,17 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+    const authHeader = req.headers.get('Authorization')
+    let userId = null
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '')
+      try {
+        const { data: userData } = await supabase.auth.getUser(token)
+        if (userData?.user) userId = userData.user.id
+      } catch (err) {
+        console.error('Falha ao verificar token:', err.message)
+      }
+    }
 
     console.log('Realizando ação NotebookLM:', action, 'Materia:', subjectId)
 

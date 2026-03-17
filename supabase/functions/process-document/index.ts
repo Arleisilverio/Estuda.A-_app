@@ -26,14 +26,39 @@ serve(async (req: Request) => {
 
     const openAiKey = Deno.env.get('OPENAI_API_KEY') || Deno.env.get('openai-api-key') || Deno.env.get('Openai_api_key') || Deno.env.get('openai_api_key')
     if (!openAiKey) throw new Error('A chave da OpenAI (OPENAI_API_KEY) não está configurada nas variáveis de ambiente')
+    const authHeader = req.headers.get('Authorization')
+    let userId = null
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '')
+      try {
+        const { data: userData } = await supabase.auth.getUser(token)
+        if (userData?.user) userId = userData.user.id
+      } catch (err) {
+        console.error('Falha ao verificar token:', err.message)
+      }
+    }
 
-    const { data: document, error: docError } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('id', documentId)
-      .single()
+    // Função auxiliar para tentar buscar o documento com retry (evita race condition)
+    const getDocumentWithRetry = async (id: string, retries = 3) => {
+      for (let i = 0; i < retries; i++) {
+        const { data, error } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('id', id)
+          .single()
+        
+        if (data) return { data, error: null }
+        if (i < retries - 1) {
+          console.log(`Tentativa ${i + 1} falhou, aguardando 1s...`)
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+      }
+      return { data: null, error: new Error('Documento não encontrado após várias tentativas') }
+    }
 
-    if (docError || !document) throw new Error('Documento não encontrado no banco de dados')
+    const { data: document, error: docError } = await getDocumentWithRetry(documentId)
+
+    if (docError || !document) throw new Error(docError?.message || 'Documento não encontrado no banco de dados')
 
     const { data: fileBlob, error: downloadError } = await supabase.storage
       .from('documents')

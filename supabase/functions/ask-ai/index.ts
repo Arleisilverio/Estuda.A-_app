@@ -28,8 +28,12 @@ serve(async (req: Request) => {
     let userId = null
     if (authHeader) {
       const token = authHeader.replace('Bearer ', '')
-      const { data: { user } } = await supabase.auth.getUser(token)
-      if (user) userId = user.id
+      try {
+        const { data: userData } = await supabase.auth.getUser(token)
+        if (userData?.user) userId = userData.user.id
+      } catch (err) {
+        console.error('Falha ao verificar token:', err.message)
+      }
     }
 
     console.log(`Buscando resposta para: "${query}" (Subject: ${subjectId})`)
