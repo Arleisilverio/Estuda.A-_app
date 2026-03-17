@@ -23,7 +23,9 @@ import {
     Clock,
     Settings,
     Info,
-    ShieldCheck
+    ShieldCheck,
+    ArrowLeft,
+    GraduationCap
 } from 'lucide-react'
 
 export default function ProfessorPortal({ session, onLogout, isAdmin, setViewingProfessorPortal }) {
@@ -122,12 +124,23 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                 setEditProfileName(profData[0].name || session.user.email)
                 setEditProfileAvatar(profData[0].avatar_url)
                 setEditProfileSubjectIds(profData.map(p => p.subject_id))
+            } else if (isAdmin) {
+                // Se for ADM/Super Admin, vamos carregar todas as matérias para ele gerenciar
+                console.log('User is Admin/SuperAdmin, bypassing professor onboarding and loading all subjects.')
+                const { data: allSubjs } = await supabase.from('subjects').select('*')
+                if (allSubjs) {
+                    setSubjects(allSubjs)
+                    if (allSubjs.length > 0) setSelectedSubject(allSubjs[0])
+                }
+                setProfessorInfo({ name: 'Administrador', avatar: null })
+                setShowOnboarding(false)
             } else {
-                // Se não tiver dados, inicia onboarding
+                // Se não tiver dados e não for ADM, inicia onboarding
                 setShowOnboarding(true)
                 const { data: allSubjs } = await supabase.from('subjects').select('*')
                 if (allSubjs) setAllAvailableSubjects(allSubjs)
             }
+
         } catch (err) {
             console.error('Erro ao buscar dados do professor:', err)
         } finally {
@@ -624,6 +637,21 @@ Pergunta: ${query}`;
                                             <p className="text-[9px] opacity-40 uppercase tracking-widest font-bold">Nome, Foto e Matérias</p>
                                         </div>
                                     </button>
+
+                                    {isAdmin && (
+                                        <button 
+                                            onClick={() => { setViewingProfessorPortal(false); setShowSettingsPopover(false); }}
+                                            className="w-full flex items-center gap-3 p-3 rounded-2xl bg-yellow-400/5 hover:bg-yellow-400/10 border border-yellow-400/10 transition-all text-left group my-1"
+                                        >
+                                            <div className="size-8 rounded-lg bg-yellow-400/10 flex items-center justify-center text-yellow-400 group-hover:scale-110 transition-transform">
+                                                <ArrowLeft size={16} />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-black text-white">Voltar ao App</p>
+                                                <p className="text-[9px] opacity-40 uppercase tracking-widest font-bold">Visão de Estudante</p>
+                                            </div>
+                                        </button>
+                                    )}
 
                                     <div className="h-px bg-white/5 my-2"></div>
 

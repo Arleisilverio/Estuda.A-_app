@@ -57,11 +57,13 @@ serve(async (req: Request) => {
     if (!queryEmbedding) throw new Error('Falha ao gerar embedding da pergunta')
 
     // 2. Buscar chunks similares no banco (vector search usando match_document_chunks)
-    // BAIXANDO O THRESHOLD PARA 0.1 POIS O MODELO DA OPENAI GERA VETORES C/ METRICAS MENORES DE DISTÂNCIA COSENO
+    // Aumentamos o match_count para 20 para garantir que, após o filtro de subject_id no JS, 
+    // ainda tenhamos conteúdo relevante suficiente.
     const matchThreshold = 0.1 
-    const matchCount = 8        // aumentar numero de docs retornados para dar mais chance de RAG
+    const matchCount = 20 
 
     const { data: documents, error: matchError } = await supabase.rpc('match_document_chunks', {
+
       query_embedding: queryEmbedding,
       match_threshold: matchThreshold,
       match_count: matchCount

@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
 import Login from './Login'
 import GradeHoraria from './GradeHoraria'
 import ProfessorPortal from './ProfessorPortal'
-import AdminDashboard from './AdminDashboard'
 import { isBiometryAvailable, bufferToBase64URL, base64URLToBuffer } from './lib/webauthn_helpers'
 import {
     FileText,
@@ -45,7 +44,7 @@ const AppLogo = ({ className = "size-14" }) => (
     <div className={`${className} relative flex items-center justify-center bg-white rounded-[30%] shadow-2xl shadow-blue-500/20 border-2 border-white/10 overflow-hidden`}>
         <img 
             src="https://i.supaimg.com/ab10c538-a9f0-4a7a-9c0d-5a65ded30e00/a022583e-d218-4eac-b41f-63e9255e4177.jpg" 
-            alt="Estuda Aí Logo" 
+            alt="Estuda A├¡ Logo" 
             className="w-full h-full object-cover"
         />
     </div>
@@ -72,14 +71,14 @@ class ErrorBoundary extends React.Component {
                     </div>
                     <h2 className="text-2xl font-black text-white mb-2">Ops! Algo deu errado.</h2>
                     <p className="text-sm text-white/40 font-medium max-w-xs mb-8">
-                        Ocorreu um erro inesperado na interface. Tente recarregar a página ou deslogar.
+                        Ocorreu um erro inesperado na interface. Tente recarregar a p├ígina ou deslogar.
                     </p>
                     <div className="flex gap-4">
                         <button 
                             onClick={() => window.location.reload()}
                             className="bg-estuda-primary text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl shadow-estuda-primary/20 hover:scale-105 active:scale-95 transition-all"
                         >
-                            Recarregar Página
+                            Recarregar P├ígina
                         </button>
                         <button 
                             onClick={async () => {
@@ -107,16 +106,15 @@ function App() {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [loading, setLoading] = useState(false)
     const [uploading, setUploading] = useState(false)
-    // Estado de Navegação e Contexto
+    // Estado de Navega├º├úo e Contexto
     const [activeTab, setActiveTab] = useState('estudo') // estudo, perfil, provas, grade
     const [selectedSubject, setSelectedSubject] = useState(null)
     const [userRole, setUserRole] = useState(null) // student, professor, admin
 
-    // Admin check — based on database role + Super Admin bypass
+    // Admin check ÔÇö based on database role
+    const isAdmin = userRole === 'admin'
+    const isProfessor = userRole === 'professor' || userRole === 'admin'
     const isSuperAdmin = session?.user?.email === 'arlei85@hotmail.com'
-    const isAdmin = userRole === 'admin' || isSuperAdmin
-    const isProfessor = userRole === 'professor' || isAdmin
-
 
     // Estado de Provas
     const [exams, setExams] = useState([])
@@ -148,17 +146,17 @@ function App() {
     const [showAbout, setShowAbout] = useState(false)
     const [viewingProfessorPortal, setViewingProfessorPortal] = useState(false)
 
-    // Estado das Matérias
+    // Estado das Mat├®rias
     const [subjects, setSubjects] = useState([])
     const [showSubjectForm, setShowSubjectForm] = useState(false)
     const [newSubjectName, setNewSubjectName] = useState('')
-    const [newSubjectIcon, setNewSubjectIcon] = useState('⚖️')
+    const [newSubjectIcon, setNewSubjectIcon] = useState('ÔÜû´©Å')
     const [userId, setUserId] = useState(null)
 
     // Estado do Perfil do Aluno
     const [perfil, setPerfil] = useState({ nome: '', turma: '', turno: '', curso: '', periodo: '', avatar: null })
-    // const [showAbout, setShowAbout] = useState(false) // Removido: integrado na página
-    // const [showPerfilForm, setShowPerfilForm] = useState(false) // Removido: integrado na página
+    // const [showAbout, setShowAbout] = useState(false) // Removido: integrado na p├ígina
+    // const [showPerfilForm, setShowPerfilForm] = useState(false) // Removido: integrado na p├ígina
     const [perfilDraft, setPerfilDraft] = useState({ nome: '', turma: '', turno: '', curso: '', periodo: '', avatar: null })
 
     // Estado da Grade
@@ -166,15 +164,14 @@ function App() {
     const [showScheduleForm, setShowScheduleForm] = useState(false)
     const [newScheduleItem, setNewScheduleItem] = useState({ day_of_week: 'SEG', start_time: '08:00', end_time: '09:00', subject_name: '', prof: '', color: '#4A90E2' })
 
-    // Estado do Histórico de Quizzes
+    // Estado do Hist├│rico de Quizzes
     const [quizHistory, setQuizHistory] = useState([])
 
-    // Estado de Gestão de Professores (ADM)
+    // Estado de Gest├úo de Professores (ADM)
     const [authEmails, setAuthEmails] = useState([])
     const [newAuthEmail, setNewAuthEmail] = useState('')
     const [isManagingProfs, setIsManagingProfs] = useState(false)
     const [isManagingUsers, setIsManagingUsers] = useState(false)
-    const [showAdminDashboard, setShowAdminDashboard] = useState(false)
     const [usersList, setUsersList] = useState([])
     const [showDevPopup, setShowDevPopup] = useState(false)
     const [isNavVisible, setIsNavVisible] = useState(true)
@@ -206,7 +203,7 @@ function App() {
             const supported = await isBiometryAvailable()
             setBiometrySupported(supported)
             
-            // Se logado, verificar se já tem biometria configurada
+            // Se logado, verificar se j├í tem biometria configurada
             if (session?.user?.id && supported) {
                 const { data } = await supabase
                     .from('user_credentials')
@@ -232,7 +229,7 @@ function App() {
             const createCredentialOptions = {
                 publicKey: {
                     challenge,
-                    rp: { name: "Estuda Aí", id: window.location.hostname },
+                    rp: { name: "Estuda A├¡", id: window.location.hostname },
                     user: {
                         id: Uint8Array.from(session.user.id.replace(/-/g, ""), c => parseInt(c, 16)),
                         name: session.user.email,
@@ -254,7 +251,7 @@ function App() {
                     user_id: session.user.id,
                     credential_id: bufferToBase64URL(credential.rawId),
                     public_key: bufferToBase64URL(credential.response.getPublicKey()),
-                    device_name: navigator.userAgent.split(')')[0].split('(')[1] || 'Dispositivo Móvel'
+                    device_name: navigator.userAgent.split(')')[0].split('(')[1] || 'Dispositivo M├│vel'
                 })
                 
                 if (error) throw error
@@ -274,7 +271,7 @@ function App() {
             setLoading(true)
             
             // 1. Obter opcionalmente o e-mail ou apenas buscar credenciais locais
-            // Por simplicidade, vamos pedir para o navegador buscar qualquer credencial do domínio
+            // Por simplicidade, vamos pedir para o navegador buscar qualquer credencial do dom├¡nio
             const challenge = new Uint8Array(32)
             window.crypto.getRandomValues(challenge)
 
@@ -292,7 +289,7 @@ function App() {
 
             const credentialId = bufferToBase64URL(assertion.rawId)
             
-            // 2. Buscar usuário vinculado a esta credencial no banco
+            // 2. Buscar usu├írio vinculado a esta credencial no banco
             const { data: credData, error: credError } = await supabase
                 .from('user_credentials')
                 .select('user_id')
@@ -300,27 +297,27 @@ function App() {
                 .single()
 
             if (credError || !credData) {
-                throw new Error('Biometria não reconhecida ou não cadastrada.')
+                throw new Error('Biometria n├úo reconhecida ou n├úo cadastrada.')
             }
 
-            // 3. Autenticar no Supabase usando um Custom Claim ou apenas setando a sessão 
-            // Como biometria no front é apenas uma alternativa ao "lembrar senha",
-            // idealmente usaríamos um token de refresh ou login via provider customizado.
-            // Para este MVP, usaremos uma política de segurança: se a biometria bateu,
-            // vamos buscar o e-mail do usuário e logar via Supabase Auth (caso o refresh token funcione).
+            // 3. Autenticar no Supabase usando um Custom Claim ou apenas setando a sess├úo 
+            // Como biometria no front ├® apenas uma alternativa ao "lembrar senha",
+            // idealmente usar├¡amos um token de refresh ou login via provider customizado.
+            // Para este MVP, usaremos uma pol├¡tica de seguran├ºa: se a biometria bateu,
+            // vamos buscar o e-mail do usu├írio e logar via Supabase Auth (caso o refresh token funcione).
             
-            // NOTA: No fluxo real de Passkeys com Supabase, seria necessária uma Edge Function 
-            // para validar a assinatura da chave pública. Como estamos num MVP sem backend complexo,
-            // vamos informar ao usuário para usar a senha caso o token tenha expirado, 
-            // ou usar a sessão persistente do Supabase que já lida com biometria no nível do SO em PWAs.
+            // NOTA: No fluxo real de Passkeys com Supabase, seria necess├íria uma Edge Function 
+            // para validar a assinatura da chave p├║blica. Como estamos num MVP sem backend complexo,
+            // vamos informar ao usu├írio para usar a senha caso o token tenha expirado, 
+            // ou usar a sess├úo persistente do Supabase que j├í lida com biometria no n├¡vel do SO em PWAs.
             
-            alert('Autenticação biométrica validada! Redirecionando...')
-            // O Supabase já mantém a sessão se o usuário não clicar em "Sair". 
-            // A biometria aqui serve para validar antes de entrar em áreas sensíveis ou 
+            alert('Autentica├º├úo biom├®trica validada! Redirecionando...')
+            // O Supabase j├í mant├®m a sess├úo se o usu├írio n├úo clicar em "Sair". 
+            // A biometria aqui serve para validar antes de entrar em ├íreas sens├¡veis ou 
             // como um "desbloqueio" de app.
             
         } catch (err) {
-            console.error('Erro no login biométrico:', err)
+            console.error('Erro no login biom├®trico:', err)
             alert(err.message)
         } finally {
             setLoading(false)
@@ -331,9 +328,9 @@ function App() {
         if (loading) return
         setLoading(true)
         try {
-            console.log('Buscando lista de usuários...')
+            console.log('Buscando lista de usu├írios...')
             
-            // 1. Buscar todos os perfis do banco de dados (o banco é a fonte da verdade para dados exibidos)
+            // 1. Buscar todos os perfis do banco de dados (o banco ├® a fonte da verdade para dados exibidos)
             const { data: dbProfiles, error: dbError } = await supabase
                 .from('profiles')
                 .select('id, name, user_role')
@@ -343,20 +340,29 @@ function App() {
                 console.error('Erro ao buscar perfis do banco:', dbError)
             }
 
-            // 2. Não usaremos mais Edge Function de user-management devido a erro sistêmico de JWT.
-            // Os dados virão primariamente da tabela profiles.
+            // 2. Chamar a Edge Function para pegar dados do Auth (como ├║ltima data de login, se dispon├¡vel)
             let authUsers = []
+            try {
+                const { data: edgeData, error: edgeError } = await supabase.functions.invoke('user-management', {
+                    body: { action: 'list' }
+                })
+                if (!edgeError && edgeData) {
+                    authUsers = edgeData.users || (Array.isArray(edgeData) ? edgeData : [])
+                }
+            } catch (efErr) {
+                console.warn('Edge function user-management falhou, usando apenas banco de dados:', efErr)
+            }
 
             // 3. Mesclar dados
-            // Priorizamos os perfis (quem já entrou no app), mas podemos achar e-mails do auth que não tem perfil ainda
+            // Priorizamos os perfis (quem j├í entrou no app), mas podemos achar e-mails do auth que n├úo tem perfil ainda
             const mergedMapped = new Map()
 
-            // Adiciona usuários do Auth primeiro
+            // Adiciona usu├írios do Auth primeiro
             authUsers.forEach(u => {
                 mergedMapped.set(u.id || u.email, {
                     id: u.id,
                     email: u.email,
-                    name: u.name || 'Usuário Auth',
+                    name: u.name || 'Usu├írio Auth',
                     last_login: u.last_sign_in_at,
                     source: 'auth'
                 })
@@ -377,7 +383,7 @@ function App() {
             }
 
             const finalUsers = Array.from(mergedMapped.values())
-            console.log('Usuários consolidados:', finalUsers.length)
+            console.log('Usu├írios consolidados:', finalUsers.length)
             
             // Garantir que temos algo se dbProfiles veio mas Edge falhou
             if (finalUsers.length === 0 && dbProfiles && dbProfiles.length > 0) {
@@ -392,72 +398,44 @@ function App() {
                 setUsersList(finalUsers)
             }
         } catch (err) {
-            console.error('Erro geral ao buscar lista de usuários:', err)
+            console.error('Erro geral ao buscar lista de usu├írios:', err)
         } finally {
             setLoading(false)
         }
     }
 
     const deleteUser = async (targetUserId, targetEmail) => {
-        if (!window.confirm(`AVISO IRREVERSÍVEL!\n\nTem certeza que deseja apagar permanentemente a conta de "${targetEmail}"?\n\nIsso apagará todos os documentos, quizzes, histórico e dados desta conta em efeito cascata. Esta ação não pode ser desfeita.`)) return
+        if (!window.confirm(`AVISO IRREVERS├ìVEL!\n\nTem certeza que deseja apagar permanentemente a conta de "${targetEmail}"?\n\nIsso apagar├í todos os documentos, quizzes, hist├│rico e dados desta conta em efeito cascata. Esta a├º├úo n├úo pode ser desfeita.`)) return
         
         setLoading(true)
         try {
-            const { data, error } = await supabase.rpc('delete_user_account', {
-                user_id_to_delete: targetUserId
+            const { error } = await supabase.functions.invoke('user-management', {
+                body: { action: 'delete', userId: targetUserId }
             })
-            if (error) {
-                console.error('---- ADMIN DELETE EXCEPTION LOG ----')
-                console.error('Error Object:', error)
-                if (error.message?.includes('could not find the function')) {
-                    alert('Erro: A função SQL de exclusão não foi instalada no Supabase.\nPor favor, execute o script SQL bypass_delete_user.sql no seu painel do Supabase.')
-                } else {
-                    alert('Erro ao excluir usuário: ' + error.message)
-                }
-                throw error
-            }
-            alert('Usuário excluído com sucesso.')
+            if (error) throw error
+            alert('Usu├írio exclu├¡do com sucesso.')
             fetchUsersList()
         } catch (err) {
-            console.error('Erro ao excluir usuário:', err)
-            alert('Erro ao excluir usuário: ' + err.message)
+            console.error('Erro ao excluir usu├írio:', err)
+            alert('Erro ao excluir usu├írio: ' + err.message)
         } finally {
             setLoading(false)
         }
     }
 
     const deleteOwnAccount = async () => {
-        if (!window.confirm('⚠️ AVISO MÁXIMO ⚠️\n\nVocê tem certeza absoluta? Esta ação apagará permanentemente sua conta e TODOS os seus arquivos, quizzes e notas definitivamente.\n\nA exclusão é irreversível.')) return
+        if (!window.confirm('ÔÜá´©Å AVISO M├üXIMO ÔÜá´©Å\n\nVoc├¬ tem certeza absoluta? Esta a├º├úo apagar├í permanentemente sua conta e TODOS os seus arquivos, quizzes e notas definitivamente.\n\nA exclus├úo ├® irrevers├¡vel.')) return
         
         setLoading(true)
         try {
-            // Log deletion for admin stats before wipe
-            await supabase.from('user_activity_logs').insert({
-                user_id: session.user.id,
-                user_name: perfil.nome,
-                user_role: userRole,
-                course: perfil.curso,
-                period: perfil.periodo,
-                event_type: 'deletion'
+            const { error } = await supabase.functions.invoke('user-management', {
+                body: { action: 'delete' }
             })
-
-            const { data, error } = await supabase.rpc('delete_user_account', {
-                user_id_to_delete: session.user.id
-            })
-            if (error) {
-                console.error('---- EDGE FUNCTION EXCEPTION LOG ----')
-                console.error('Error Object:', error)
-                if (error.message?.includes('could not find the function')) {
-                    alert('Erro: A função SQL de exclusão não foi instalada no Supabase.\nPor favor, execute o script SQL bypass_delete_user.sql no seu painel do Supabase.')
-                } else {
-                    alert('Erro ao excluir usuário: ' + error.message)
-                }
-                throw error
-            }
+            if (error) throw error
             alert('Sua conta e todos os dados foram removidos com sucesso.')
             await supabase.auth.signOut()
         } catch (err) {
-            console.error('Erro ao excluir própria conta:', err)
+            console.error('Erro ao excluir pr├│pria conta:', err)
             alert('Erro ao excluir conta: ' + err.message)
         } finally {
             setLoading(false)
@@ -546,7 +524,7 @@ function App() {
         setPerfilDraft({ ...perfil })
         // setShowPerfilForm(true) // Removido
     }
-    const SUBJECT_ICONS = ['⚖️', '📖', '🏛️', '📜', '🎓', '💼', '✌️', '📚']
+    const SUBJECT_ICONS = ['ÔÜû´©Å', '­ƒôû', '­ƒÅø´©Å', '­ƒô£', '­ƒÄô', '­ƒÆ╝', 'Ô£î´©Å', '­ƒôÜ']
 
     useEffect(() => {
         // Listen to auth state changes reactively
@@ -603,9 +581,9 @@ function App() {
         }
     }
 
-    // Função para verificar se a nota do professor ainda é válida (menos de 24h)
+    // Fun├º├úo para verificar se a nota do professor ainda ├® v├ílida (menos de 24h)
     const isNoteValid = (updatedAt) => {
-        if (!updatedAt) return true; // Fallback se não tiver data (notas antigas)
+        if (!updatedAt) return true; // Fallback se n├úo tiver data (notas antigas)
         const noteDate = new Date(updatedAt);
         const now = new Date();
         const diffInHours = (now - noteDate) / (1000 * 60 * 60);
@@ -627,11 +605,11 @@ function App() {
                 notes_updated_at: s.notes_updated_at
             })))
         } catch (e) {
-            console.error('Erro ao buscar matérias:', e)
+            console.error('Erro ao buscar mat├®rias:', e)
         }
     }
 
-    // Inscrição em Tempo Real para Matérias (Notas do Professor)
+    // Inscri├º├úo em Tempo Real para Mat├®rias (Notas do Professor)
     useEffect(() => {
         if (!session) return
 
@@ -642,7 +620,7 @@ function App() {
                 schema: 'public', 
                 table: 'subjects' 
             }, (payload) => {
-                console.log('Matéria atualizada em tempo real:', payload.new)
+                console.log('Mat├®ria atualizada em tempo real:', payload.new)
                 const updatedSubject = payload.new
                 
                 setSubjects(prev => prev.map(s => 
@@ -655,7 +633,7 @@ function App() {
                     : s
                 ))
 
-                // Se a matéria atualizada for a selecionada, atualiza as notas na visualização
+                // Se a mat├®ria atualizada for a selecionada, atualiza as notas na visualiza├º├úo
                 setSelectedSubject(prev => {
                     if (prev && prev.id === updatedSubject.id) {
                         return {
@@ -719,7 +697,7 @@ function App() {
             if (error) console.error('Erro ao buscar documentos:', error)
             else setFiles(data || [])
         } catch (e) {
-            console.warn('Supabase não conectado ou erro de rede')
+            console.warn('Supabase n├úo conectado ou erro de rede')
         }
     }
 
@@ -734,7 +712,7 @@ function App() {
             if (error) throw error
             setQuizHistory(data || [])
         } catch (e) {
-            console.warn('Erro ao buscar histórico de quizzes:', e)
+            console.warn('Erro ao buscar hist├│rico de quizzes:', e)
         }
     }
 
@@ -756,7 +734,7 @@ function App() {
         setLoading(true)
         try {
             const { data: { session } } = await supabase.auth.getSession()
-            if (!session) { alert('Você precisa estar logado.'); return }
+            if (!session) { alert('Voc├¬ precisa estar logado.'); return }
 
             const { error } = await supabase
                 .from('exams')
@@ -835,7 +813,7 @@ function App() {
 
             // Fetch again to update UI with 'ready' status
             await fetchDocuments(selectedSubject?.id)
-            alert('Documento processado com sucesso! O Professor IA já aprendeu este conteúdo.')
+            alert('Documento processado com sucesso! O Professor IA j├í aprendeu este conte├║do.')
 
         } catch (error) {
             console.error('Erro no upload ou processamento:', error.message)
@@ -853,13 +831,8 @@ function App() {
         setLoading(true)
 
         try {
-            // Reinforce RAG constraints and structure in the query
-            const ragQuery = `IMPORTANTE: RESPONDA APENAS COM BASE NOS MATERIAIS FORNECIDOS PELO PROFESSOR.
-Responda de forma clara e profissional:
-- Use listas (•) para múltiplos pontos
-- Use negrito (**termo**) para conceitos chave
-- Use espaçamento duplo entre parágrafos
-- Se a informação não estiver nos materiais, diga que não encontrou no conteúdo da disciplina.
+            // Reinforce RAG constraints in the query itself to ensure the AI doesn't use external info
+            const ragQuery = `IMPORTANTE: RESPONDA APENAS COM BASE NOS MATERIAIS FORNECIDOS PELO PROFESSOR. N├âO USE SEU CONHECIMENTO PR├ëVIO OU INTERNET. SE A INFORMA├ç├âO N├âO ESTIVER NOS MATERIAIS, DIGA QUE N├âO ENCONTROU NO CONTE├ÜDO DA DISCIPLINA.
 
 Pergunta do Aluno: ${query}`;
 
@@ -875,7 +848,7 @@ Pergunta do Aluno: ${query}`;
             setMessages(prev => [...prev, aiMessage])
         } catch (error) {
             console.error('Erro ao perguntar:', error)
-            alert('Não foi possível se comunicar com o Professor: ' + error.message)
+            alert('N├úo foi poss├¡vel se comunicar com o Professor: ' + error.message)
         } finally {
             setLoading(false)
         }
@@ -893,7 +866,7 @@ Pergunta do Aluno: ${query}`;
     const generateQuiz = async (filterDocId = '') => {
         if (!selectedSubject) return
 
-        // Limite de 1 quiz por matéria por dia para alunos
+        // Limite de 1 quiz por mat├®ria por dia para alunos
         if (userRole === 'student') {
             try {
                 const today = new Date();
@@ -909,7 +882,7 @@ Pergunta do Aluno: ${query}`;
                 if (checkError) throw checkError;
 
                 if (count && count > 0) {
-                    alert(`Você já realizou o quiz de "${selectedSubject.name}" hoje. \n\nPara otimizar seu aprendizado e evitar sobrecarga, permitimos apenas um quiz por matéria por dia. Volte amanhã para um novo desafio!`);
+                    alert(`Voc├¬ j├í realizou o quiz de "${selectedSubject.name}" hoje. \n\nPara otimizar seu aprendizado e evitar sobrecarga, permitimos apenas um quiz por mat├®ria por dia. Volte amanh├ú para um novo desafio!`);
                     return;
                 }
             } catch (err) {
@@ -932,7 +905,7 @@ Pergunta do Aluno: ${query}`;
 
             if (error) throw error
             if (!data || !data.questions || data.questions.length === 0) {
-                throw new Error("Nenhuma questão retornada pela IA")
+                throw new Error("Nenhuma quest├úo retornada pela IA")
             }
 
             setQuizQuestions(data.questions)
@@ -942,12 +915,12 @@ Pergunta do Aluno: ${query}`;
             setQuizMode(true)
             
             if (!data.basedOnMaterials) {
-                // Pequeno aviso se não usou os materiais
-                setTimeout(() => alert("Aviso: Nenhum material de estudo processado foi encontrado para esta matéria. O Quiz foi gerado com conhecimentos gerais Acadêmicos."), 500)
+                // Pequeno aviso se n├úo usou os materiais
+                setTimeout(() => alert("Aviso: Nenhum material de estudo processado foi encontrado para esta mat├®ria. O Quiz foi gerado com conhecimentos gerais Acad├¬micos."), 500)
             }
         } catch (error) {
             console.error('Erro ao gerar quiz:', error)
-            alert('Não foi possível gerar as questões do Quiz neste momento.')
+            alert('N├úo foi poss├¡vel gerar as quest├Áes do Quiz neste momento.')
         } finally {
             setLoading(false)
         }
@@ -1006,7 +979,7 @@ Pergunta do Aluno: ${query}`;
             setMessages(prev => [...prev, aiMessage])
         } catch (error) {
             console.error('Erro ao gerar resumo:', error)
-            alert('Não foi possível gerar o resumo. Tente novamente em instantes.')
+            alert('N├úo foi poss├¡vel gerar o resumo. Tente novamente em instantes.')
         } finally {
             setLoading(false)
         }
@@ -1034,7 +1007,7 @@ Pergunta do Aluno: ${query}`;
             setMessages(prev => [...prev, aiMessage])
         } catch (error) {
             console.error('Erro ao gerar guia:', error)
-            alert('Não foi possível gerar o guia de estudo.')
+            alert('N├úo foi poss├¡vel gerar o guia de estudo.')
         } finally {
             setLoading(false)
         }
@@ -1045,7 +1018,7 @@ Pergunta do Aluno: ${query}`;
         setLoading(true)
         setShowDocSelect(false)
         
-        const userMsg = { role: 'user', content: 'Extrair citações diretas relevantes.' }
+        const userMsg = { role: 'user', content: 'Extrair cita├º├Áes diretas relevantes.' }
         setMessages(prev => [...prev, userMsg])
 
         try {
@@ -1061,8 +1034,8 @@ Pergunta do Aluno: ${query}`;
             const aiMessage = { role: 'assistant', content: data.result, type: 'citations' }
             setMessages(prev => [...prev, aiMessage])
         } catch (error) {
-            console.error('Erro ao buscar citações:', error)
-            alert('Não foi possível extrair as citações.')
+            console.error('Erro ao buscar cita├º├Áes:', error)
+            alert('N├úo foi poss├¡vel extrair as cita├º├Áes.')
         } finally {
             setLoading(false)
         }
@@ -1124,9 +1097,9 @@ Pergunta do Aluno: ${query}`;
                 fetchSubjects()
                 setShowSubjectForm(false)
                 setNewSubjectName('')
-                setNewSubjectIcon('⚖️')
+                setNewSubjectIcon('ÔÜû´©Å')
             } catch (e) {
-                console.error('Erro ao criar matéria:', e)
+                console.error('Erro ao criar mat├®ria:', e)
             } finally {
                 setLoading(false)
             }
@@ -1148,7 +1121,7 @@ Pergunta do Aluno: ${query}`;
                     start_time: newScheduleItem.start_time,
                     end_time: newScheduleItem.end_time,
                     subject_name: newScheduleItem.subject_name,
-                    room: newScheduleItem.prof, // Reutilizando campo prof p/ room se necessário ou prof
+                    room: newScheduleItem.prof, // Reutilizando campo prof p/ room se necess├írio ou prof
                     color: newScheduleItem.color
                 }])
 
@@ -1163,7 +1136,7 @@ Pergunta do Aluno: ${query}`;
         }
     }
 
-    // Auth guard — show loading spinner, login screen, or app
+    // Auth guard ÔÇö show loading spinner, login screen, or app
     if (session === undefined) {
         return (
             <div className="min-h-screen bg-estuda-bg flex items-center justify-center">
@@ -1186,7 +1159,7 @@ Pergunta do Aluno: ${query}`;
                             Preparando seu ambiente...
                         </p>
                     </div>
-                    {/* Botão de segurança para casos de travamento no carregamento de ambiente */}
+                    {/* Bot├úo de seguran├ºa para casos de travamento no carregamento de ambiente */}
                     <button 
                         onClick={() => window.location.reload()}
                         className="mt-4 text-[8px] font-black uppercase tracking-widest opacity-20 hover:opacity-100 transition-all"
@@ -1226,7 +1199,7 @@ Pergunta do Aluno: ${query}`;
                             {perfil.nome ? perfil.nome.split(' ')[0] : 'Estudante'}
                         </p>
                         <p className="text-[9px] text-estuda-primary font-bold uppercase tracking-wider leading-tight">
-                            {perfil.curso || 'Não definido'} {perfil.periodo ? `· ${perfil.periodo}º Período` : ''}
+                            {perfil.curso || 'N├úo definido'} {perfil.periodo ? `┬À ${perfil.periodo}┬║ Per├¡odo` : ''}
                         </p>
                         <p className="text-[8px] text-white/40 font-bold uppercase tracking-widest mt-0.5">
                             {perfil.turno || '---'} {perfil.turma ? `[${perfil.turma}]` : ''}
@@ -1248,15 +1221,8 @@ Pergunta do Aluno: ${query}`;
                         {isMenuOpen && (
                             <div className="absolute right-0 mt-3 w-48 glass rounded-2xl shadow-xl border border-estuda-primary/10 py-2 z-50 animate-fade-in">
                                 {isAdmin && (
-                                    <div className="px-4 py-1.5 flex flex-col gap-2">
-                                        <span className="text-[9px] font-black uppercase tracking-widest text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded-full w-fit">⭐ Administrador</span>
-                                        <button
-                                            onClick={() => { setViewingProfessorPortal(true); setIsMenuOpen(false); }}
-                                            className="w-full py-2.5 px-3 bg-estuda-primary/10 hover:bg-estuda-primary/20 text-estuda-primary rounded-xl flex items-center gap-2 transition-all border border-estuda-primary/20 group"
-                                        >
-                                            <GraduationCap size={16} className="group-hover:scale-110 transition-transform" />
-                                            <span className="text-[10px] font-black uppercase tracking-widest leading-none">Portal do Prof</span>
-                                        </button>
+                                    <div className="px-4 py-1.5">
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded-full">Ô¡É Administrador</span>
                                     </div>
                                 )}
                                 <button
@@ -1269,7 +1235,7 @@ Pergunta do Aluno: ${query}`;
                                     onClick={() => { openPerfilForm(); setIsMenuOpen(false); }}
                                     className="w-full px-4 py-2 flex items-center gap-2 hover:bg-estuda-primary/5 text-sm font-medium"
                                 >
-                                    <Settings size={16} /> Configurações
+                                    <Settings size={16} /> Configura├º├Áes
                                 </button>
                                 <div className="h-px bg-estuda-primary/10 my-1 mx-2"></div>
                                 <button
@@ -1308,7 +1274,7 @@ Pergunta do Aluno: ${query}`;
                             <h2 className="text-xl sm:text-3xl font-bold mb-1 sm:mb-2">
                                 {carouselSlides[currentSlide]?.caption || 'Potencialize seus estudos'}
                             </h2>
-                            <p className="text-[10px] sm:text-sm opacity-90 font-medium">Use nossa IA para entender conteúdos complexos em segundos.</p>
+                            <p className="text-[10px] sm:text-sm opacity-90 font-medium">Use nossa IA para entender conte├║dos complexos em segundos.</p>
                         </div>
 
                         {/* Seletores de bolinha */}
@@ -1322,7 +1288,7 @@ Pergunta do Aluno: ${query}`;
                             ))}
                         </div>
 
-                        {/* Botão Gerenciar Slides — apenas admin */}
+                        {/* Bot├úo Gerenciar Slides ÔÇö apenas admin */}
                         {isAdmin && (
                             <button
                                 onClick={() => setShowCarouselManager(true)}
@@ -1337,12 +1303,12 @@ Pergunta do Aluno: ${query}`;
                 {/* Content Area Switcher */}
                 {!selectedSubject ? (
                     <>
-                        {/* Seção de Matérias (Home) */}
+                        {/* Se├º├úo de Mat├®rias (Home) */}
                         {activeTab === 'estudo' && (
                             <section className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
                                 <div className="flex items-center justify-between mb-6">
                                     <h3 className="text-xl font-bold flex items-center gap-3">
-                                        <Layers size={24} className="text-estuda-primary" /> Minhas Matérias
+                                        <Layers size={24} className="text-estuda-primary" /> Minhas Mat├®rias
                                     </h3>
                                     <button
                                         onClick={() => setActiveTab('grade')}
@@ -1381,9 +1347,9 @@ Pergunta do Aluno: ${query}`;
                                                 <button
                                                     onClick={async (e) => {
                                                         e.stopPropagation();
-                                                        if (confirm(`ATENÇÃO! Excluir a matéria "${subject.name}"? Todos os PDFs da matéria serão apagados da nuvem e do aplicativo para sempre. Prosseguir?`)) {
+                                                        if (confirm(`ATEN├ç├âO! Excluir a mat├®ria "${subject.name}"? Todos os PDFs da mat├®ria ser├úo apagados da nuvem e do aplicativo para sempre. Prosseguir?`)) {
                                                             try {
-                                                                // 1. Procurar os arquivos da matéria alvo
+                                                                // 1. Procurar os arquivos da mat├®ria alvo
                                                                 const { data: docsToPurge } = await supabase
                                                                     .from('documents')
                                                                     .select('id, file_path')
@@ -1396,7 +1362,7 @@ Pergunta do Aluno: ${query}`;
                                                                     // 2.1 Queimar PDFs do Supabase Storage
                                                                     await supabase.storage.from('documents').remove(paths);
                                                                     
-                                                                    // 2.2 Queimar Tabela Documentos (o Supabase já limpa document_chunks em cascata graças ao CASCADE que preparamos)
+                                                                    // 2.2 Queimar Tabela Documentos (o Supabase j├í limpa document_chunks em cascata gra├ºas ao CASCADE que preparamos)
                                                                     await supabase.from('documents').delete().eq('subject_id', subject.id);
                                                                 }
 
@@ -1411,7 +1377,7 @@ Pergunta do Aluno: ${query}`;
                                                                     setFiles([]);
                                                                 }
                                                             } catch (err) {
-                                                                alert('Falha total ao excluir a matéria com seus arquivos: ' + err.message);
+                                                                alert('Falha total ao excluir a mat├®ria com seus arquivos: ' + err.message);
                                                             }
                                                         }
                                                     }}
@@ -1428,7 +1394,7 @@ Pergunta do Aluno: ${query}`;
                     </>
                 ) : (
                     <section className="animate-fade-in flex flex-col h-[calc(100vh-14rem)]">
-                        {/* Cabeçalho do Professor IA */}
+                        {/* Cabe├ºalho do Professor IA */}
                         <div className="flex items-center justify-between bg-estuda-surface p-4 sm:p-6 rounded-t-[2rem] border border-estuda-primary/10 shadow-lg relative shrink-0">
                             <div className="absolute top-0 left-0 w-1 h-full bg-estuda-primary"></div>
                             <div className="flex items-center gap-4">
@@ -1462,7 +1428,7 @@ Pergunta do Aluno: ${query}`;
                                         onClick={() => handleActionClick('citations')}
                                         className="bg-emerald-600 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl font-bold flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg text-[10px] sm:text-xs whitespace-nowrap"
                                     >
-                                        <Quote size={16} /> Citações
+                                        <Quote size={16} /> Cita├º├Áes
                                     </button>
                                     <button
                                         onClick={() => handleActionClick('quiz')}
@@ -1494,7 +1460,7 @@ Pergunta do Aluno: ${query}`;
                                             </button>
                                         </div>
 
-                                        {/* Lista de Questões com Scroll */}
+                                        {/* Lista de Quest├Áes com Scroll */}
                                         <div className="flex-1 overflow-y-auto p-4 sm:p-8 flex flex-col gap-8 custom-scrollbar">
                                             {quizQuestions.map((q, qIdx) => (
                                                 <div key={q.id} className="bg-estuda-bg/30 p-6 rounded-3xl border border-estuda-primary/5 animate-fade-in">
@@ -1536,7 +1502,7 @@ Pergunta do Aluno: ${query}`;
                                                 <GraduationCap size={48} />
                                             </div>
                                             <h3 className="text-3xl font-black mb-2">Quiz Finalizado!</h3>
-                                            <p className="text-estuda-primary-medium font-bold mb-8">Ótimo desempenho em {selectedSubject?.name}</p>
+                                            <p className="text-estuda-primary-medium font-bold mb-8">├ôtimo desempenho em {selectedSubject?.name}</p>
 
                                             <div className="flex justify-center gap-8 mb-10 w-full max-w-sm">
                                                 <div className="flex-1 bg-estuda-bg/50 p-4 rounded-3xl border border-estuda-primary/5">
@@ -1562,10 +1528,10 @@ Pergunta do Aluno: ${query}`;
                                             </div>
                                         </div>
 
-                                        {/* Mapeamento das questões para revisão (Erros) */}
+                                        {/* Mapeamento das quest├Áes para revis├úo (Erros) */}
                                         <div className="mt-8 pt-4">
                                             <h4 className="text-xl font-black text-white mb-6 flex items-center gap-2">
-                                                <MessageSquare size={20} className="text-estuda-primary" /> Correção e Feedback
+                                                <MessageSquare size={20} className="text-estuda-primary" /> Corre├º├úo e Feedback
                                             </h4>
                                             <div className="flex flex-col gap-6">
                                                 {quizQuestions.map((q, qIdx) => {
@@ -1583,14 +1549,14 @@ Pergunta do Aluno: ${query}`;
                                                             <div className="text-xs space-y-2 mt-2">
                                                                 <div className="flex items-center gap-2 text-white/50">
                                                                     <span className="font-bold w-12 shrink-0">Sua exp:</span> 
-                                                                    <span className={isCorrect ? 'text-green-400 font-bold' : 'text-red-400 line-through'}>{q.options[userAnswer] || "Não respondeu"}</span>
+                                                                    <span className={isCorrect ? 'text-green-400 font-bold' : 'text-red-400 line-through'}>{q.options[userAnswer] || "N├úo respondeu"}</span>
                                                                 </div>
                                                                 {!isCorrect && q.explanation && (
                                                                     <div className="mt-4 p-4 rounded-xl bg-estuda-surface border border-estuda-primary/20">
                                                                         <div className="flex items-start gap-2">
                                                                             <BookOpen size={16} className="text-estuda-primary shrink-0 mt-0.5" />
                                                                             <div>
-                                                                                <p className="text-[10px] font-black uppercase text-estuda-primary mb-1 tracking-widest">Explicação do Professor</p>
+                                                                                <p className="text-[10px] font-black uppercase text-estuda-primary mb-1 tracking-widest">Explica├º├úo do Professor</p>
                                                                                 <p className="font-medium text-white/80 leading-relaxed">{q.explanation}</p>
                                                                             </div>
                                                                         </div>
@@ -1608,14 +1574,14 @@ Pergunta do Aluno: ${query}`;
                         ) : (
                             /* Modo Chat WhatsApp */
                             <div className="flex-1 flex flex-col bg-estuda-surface border-x border-estuda-primary/10 overflow-hidden relative">
-                                {/* Cabeçalho do Chat com Anotações do Professor */}
+                                {/* Cabe├ºalho do Chat com Anota├º├Áes do Professor */}
                                 {selectedSubject?.professor_notes && isNoteValid(selectedSubject.notes_updated_at) && (
                                     <div className="bg-estuda-bg/80 backdrop-blur-md border-b border-estuda-primary/10 p-3 flex items-start gap-3 animate-fade-in relative z-10">
                                         <div className="shrink-0 p-2 rounded-xl bg-estuda-primary/10 text-estuda-primary mt-1">
                                             <Sparkles size={16} />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-[9px] font-black uppercase tracking-widest text-estuda-primary opacity-70 mb-0.5">Anotações Importantes do Professor</p>
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-estuda-primary opacity-70 mb-0.5">Anota├º├Áes Importantes do Professor</p>
                                             <p className="text-[11px] font-bold text-white/90 leading-relaxed italic">
                                                 "{selectedSubject.professor_notes}"
                                             </p>
@@ -1623,13 +1589,13 @@ Pergunta do Aluno: ${query}`;
                                     </div>
                                 )}
 
-                                {/* Área de Mensagens */}
+                                {/* ├ürea de Mensagens */}
                                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-4 custom-scrollbar bg-estuda-bg/50">
                                     {messages.length === 0 ? (
                                         <div className="flex-1 flex flex-col items-center justify-center text-center p-8 opacity-20">
                                             <MessageSquare size={64} className="mb-4" />
                                             <h3 className="text-xl font-bold">Inicie um papo com o Prof. Virtual</h3>
-                                            <p className="text-sm font-medium max-w-xs mx-auto">Tire dúvidas sobre seus arquivos de {selectedSubject?.name} agora mesmo.</p>
+                                            <p className="text-sm font-medium max-w-xs mx-auto">Tire d├║vidas sobre seus arquivos de {selectedSubject?.name} agora mesmo.</p>
 
                                             {/* Notas do Professor para o Aluno */}
                                             {selectedSubject?.professor_notes && isNoteValid(selectedSubject.notes_updated_at) && (
@@ -1667,7 +1633,7 @@ Pergunta do Aluno: ${query}`;
                                                 key={idx}
                                                 className={`flex flex-col max-w-[85%] sm:max-w-[70%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'} animate-fade-in`}
                                             >
-                                                <div className={`p-4 sm:p-5 rounded-2xl text-xs sm:text-sm leading-relaxed max-w-full transition-all duration-500 relative whitespace-pre-wrap ${
+                                                <div className={`p-4 sm:p-5 rounded-2xl text-xs sm:text-sm leading-relaxed max-w-full transition-all duration-500 relative ${
                                                         msg.role === 'user'
                                                             ? 'bg-estuda-primary text-white font-medium shadow-lg'
                                                             : msg.type === 'summary' 
@@ -1682,7 +1648,7 @@ Pergunta do Aluno: ${query}`;
                                                             <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10">
                                                                 {msg.type === 'summary' && <><Sparkles size={16} className="text-purple-400" /> <span className="font-bold text-purple-400 uppercase tracking-wider text-[10px]">Resumo Estruturado</span></>}
                                                                 {msg.type === 'guide' && <><BookOpen size={16} className="text-blue-400" /> <span className="font-bold text-blue-400 uppercase tracking-wider text-[10px]">Guia de Estudo</span></>}
-                                                                {msg.type === 'citations' && <><Quote size={16} className="text-emerald-400" /> <span className="font-bold text-emerald-400 uppercase tracking-wider text-[10px]">Citações Diretas</span></>}
+                                                                {msg.type === 'citations' && <><Quote size={16} className="text-emerald-400" /> <span className="font-bold text-emerald-400 uppercase tracking-wider text-[10px]">Cita├º├Áes Diretas</span></>}
                                                             </div>
                                                         )}
                                                         <div className="whitespace-pre-wrap prose prose-invert max-w-none prose-sm">
@@ -1699,10 +1665,10 @@ Pergunta do Aluno: ${query}`;
                                                             </div>
                                                         )}
 
-                                                        {/* Indicador de "rabinho" do balão */}
+                                                        {/* Indicador de "rabinho" do bal├úo */}
                                                         <div className={`absolute top-0 size-3 transform ${msg.role === 'user' ? 'bg-estuda-primary right-[-6px] rounded-br-full translate-x-1/2' : 'bg-white/10 border-l border-t border-white/10 left-[-6px] rounded-bl-full -translate-x-1/2'}`}></div>
                                                     </div>
-                                                <span className="text-[9px] font-black uppercase opacity-30 mt-1 tracking-widest">{msg.role === 'user' ? 'Você' : 'Professor IA'}</span>
+                                                <span className="text-[9px] font-black uppercase opacity-30 mt-1 tracking-widest">{msg.role === 'user' ? 'Voc├¬' : 'Professor IA'}</span>
                                             </div>
                                         ))
                                     )}
@@ -1710,7 +1676,7 @@ Pergunta do Aluno: ${query}`;
                                         <div className="self-start flex flex-col items-start animate-pulse">
                                             <div className="bg-estuda-surface p-4 rounded-2xl border border-estuda-primary/10 rounded-tl-none flex items-center gap-2">
                                                 <Loader2 size={16} className="animate-spin text-estuda-primary" />
-                                                <span className="text-xs font-bold opacity-60">O Professor está elaborando...</span>
+                                                <span className="text-xs font-bold opacity-60">O Professor est├í elaborando...</span>
                                             </div>
                                         </div>
                                     )}
@@ -1730,7 +1696,7 @@ Pergunta do Aluno: ${query}`;
                                                         handleAsk();
                                                     }
                                                 }}
-                                                placeholder="Sua dúvida sobre a matéria..."
+                                                placeholder="Sua d├║vida sobre a mat├®ria..."
                                                 className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl py-3.5 px-5 text-sm focus:outline-none focus:ring-2 focus:ring-estuda-primary/20 transition-all font-medium placeholder:text-estuda-primary/30 resize-none max-h-32"
                                             />
                                         </div>
@@ -1767,7 +1733,7 @@ Pergunta do Aluno: ${query}`;
                             <div className="bg-estuda-surface/40 border-2 border-dashed border-estuda-primary/10 rounded-[2rem] flex flex-col items-center justify-center text-estuda-text/40 p-12 text-center sm:h-64 h-48">
                                 <Calendar size={48} className="opacity-20 mb-4 sm:w-16 sm:h-16 w-12 h-12" />
                                 <h4 className="text-base sm:text-lg font-bold mb-2 opacity-60">Nenhuma prova agendada</h4>
-                                <p className="text-xs sm:text-sm font-medium opacity-40 max-w-xs">Mantenha seu calendário organizado adicionando suas próximas datas de avaliação.</p>
+                                <p className="text-xs sm:text-sm font-medium opacity-40 max-w-xs">Mantenha seu calend├írio organizado adicionando suas pr├│ximas datas de avalia├º├úo.</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1815,10 +1781,10 @@ Pergunta do Aluno: ${query}`;
                     </section>
                 )}
 
-                {/* Aba Grade Horária */}
+                {/* Aba Grade Hor├íria */}
                 {activeTab === 'grade' && !selectedSubject && (() => {
-                    const days = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB']
-                    const dayLabels = { SEG: 'Segunda', TER: 'Terça', QUA: 'Quarta', QUI: 'Quinta', SEX: 'Sexta', SÁB: 'Sábado' }
+                    const days = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'S├üB']
+                    const dayLabels = { SEG: 'Segunda', TER: 'Ter├ºa', QUA: 'Quarta', QUI: 'Quinta', SEX: 'Sexta', S├üB: 'S├íbado' }
 
                     return (
                         <section className="animate-fade-in pb-24 flex flex-col gap-5">
@@ -1828,7 +1794,7 @@ Pergunta do Aluno: ${query}`;
                                         <span className="text-estuda-primary font-black uppercase" style={{ fontSize: 10, letterSpacing: '0.12em' }}>{perfil.turma || 'Turmas Normais'}</span>
                                     </div>
                                     <h2 className="text-2xl font-black">Grade Semanal</h2>
-                                    <p className="opacity-50 font-semibold mt-1" style={{ fontSize: 10 }}>{perfil.turno || 'MANHÃ'} · {perfil.curso || 'DIREITO'} · arraste para o lado →</p>
+                                    <p className="opacity-50 font-semibold mt-1" style={{ fontSize: 10 }}>{perfil.turno || 'MANH├â'} ┬À {perfil.curso || 'DIREITO'} ┬À arraste para o lado ÔåÆ</p>
                                 </div>
                                 {isAdmin && (
                                     <button
@@ -1944,7 +1910,7 @@ Pergunta do Aluno: ${query}`;
                                     </div>
                                 </div>
 
-                                {/* Formulário de Edição Direto na Página */}
+                                {/* Formul├írio de Edi├º├úo Direto na P├ígina */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-4">
                                         <div>
@@ -1969,14 +1935,14 @@ Pergunta do Aluno: ${query}`;
                                     <div className="space-y-4">
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Período</label>
+                                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Per├¡odo</label>
                                                 <select
                                                     value={perfilDraft.periodo}
                                                     onChange={e => setPerfilDraft(p => ({ ...p, periodo: e.target.value }))}
                                                     className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-estuda-primary/50 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M5%207L10%2012L15%207%22%20stroke%3D%22%234A90E2%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E')] bg-[length:20px] bg-[right_12px_center] bg-no-repeat pr-10"
                                                 >
                                                     <option value="">--</option>
-                                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n}º</option>)}
+                                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n}┬║</option>)}
                                                 </select>
                                             </div>
                                             <div>
@@ -1987,7 +1953,7 @@ Pergunta do Aluno: ${query}`;
                                                     className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-estuda-primary/50 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M5%207L10%2012L15%207%22%20stroke%3D%22%234A90E2%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E')] bg-[length:20px] bg-[right_12px_center] bg-no-repeat pr-10"
                                                 >
                                                     <option value="">--</option>
-                                                    <option value="Manhã">Manhã</option>
+                                                    <option value="Manh├ú">Manh├ú</option>
                                                     <option value="Tarde">Tarde</option>
                                                     <option value="Noite">Noite</option>
                                                     <option value="Integral">Integral</option>
@@ -2008,7 +1974,7 @@ Pergunta do Aluno: ${query}`;
                             </div>
                         </div>
 
-                        {/* Botão Sobre o Criador (Refatorado) */}
+                        {/* Bot├úo Sobre o Criador (Refatorado) */}
                         <button 
                             onClick={() => setShowDevPopup(true)}
                             className="w-full bg-estuda-surface p-6 sm:p-8 rounded-[2.5rem] border border-estuda-primary/10 flex items-center justify-between group hover:bg-estuda-primary/5 transition-all text-left"
@@ -2019,13 +1985,13 @@ Pergunta do Aluno: ${query}`;
                                 </div>
                                 <div>
                                     <h4 className="text-base font-black text-white">Sobre o Criador</h4>
-                                    <p className="text-[10px] opacity-40 font-black uppercase tracking-widest">Conheça o desenvolvedor do projeto</p>
+                                    <p className="text-[10px] opacity-40 font-black uppercase tracking-widest">Conhe├ºa o desenvolvedor do projeto</p>
                                 </div>
                             </div>
                             <ChevronRight size={24} className="text-estuda-primary/40 group-hover:translate-x-1 transition-transform" />
                         </button>
 
-                        {/* Botão para Portal do Professor (Somente ADM) */}
+                        {/* Bot├úo para Portal do Professor (Somente ADM) */}
                         {isAdmin && (
                             <button
                                 onClick={() => setViewingProfessorPortal(true)}
@@ -2037,14 +2003,14 @@ Pergunta do Aluno: ${query}`;
                                     </div>
                                     <div className="text-left">
                                         <h4 className="text-base font-black text-white leading-none mb-1.5">Acessar Portal do Professor</h4>
-                                        <p className="text-[10px] opacity-40 font-black uppercase tracking-widest">Gestão de provas e conteúdos</p>
+                                        <p className="text-[10px] opacity-40 font-black uppercase tracking-widest">Gest├úo de provas e conte├║dos</p>
                                     </div>
                                 </div>
                                 <ChevronRight size={24} className="text-estuda-primary/40 group-hover:translate-x-1 transition-transform" />
                             </button>
                         )}
 
-                        {/* Botão Excluir Conta (Auto-exclusão) */}
+                        {/* Bot├úo Excluir Conta (Auto-exclus├úo) */}
                         <div className="px-4">
                             <button 
                                 onClick={deleteOwnAccount}
@@ -2052,10 +2018,10 @@ Pergunta do Aluno: ${query}`;
                             >
                                 <Trash2 size={16} /> Excluir Minha Conta Permanente
                             </button>
-                            <p className="text-[9px] text-center text-white/20 mt-3 font-bold uppercase tracking-tighter">Atenção: A exclusão é imediata e apagará todos os seus dados.</p>
+                            <p className="text-[9px] text-center text-white/20 mt-3 font-bold uppercase tracking-tighter">Aten├º├úo: A exclus├úo ├® imediata e apagar├í todos os seus dados.</p>
                         </div>
 
-                        {/* Histórico de Quizzes */}
+                        {/* Hist├│rico de Quizzes */}
                         <div className="bg-estuda-surface p-6 sm:p-8 rounded-[2.5rem] border border-estuda-primary/10">
                             <h3 className="text-lg font-black mb-5 flex items-center gap-3">
                                 <History size={22} className="text-estuda-primary" /> Desempenho nos Quizzes
@@ -2064,7 +2030,7 @@ Pergunta do Aluno: ${query}`;
                                 <div className="flex flex-col items-center justify-center py-10 opacity-40 text-center">
                                     <PlayCircle size={40} className="mb-3 opacity-30" />
                                     <p className="text-sm font-bold">Nenhum quiz realizado ainda</p>
-                                    <p className="text-xs mt-1">Complete um quiz na aba Estudo para ver seu histórico aqui.</p>
+                                    <p className="text-xs mt-1">Complete um quiz na aba Estudo para ver seu hist├│rico aqui.</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2083,7 +2049,7 @@ Pergunta do Aluno: ${query}`;
                                                 </div>
                                                 <div className="text-right shrink-0">
                                                     <p className={`text-2xl font-black ${color}`}>{pct}%</p>
-                                                    <p className="text-[10px] font-bold opacity-40">Pontuação</p>
+                                                    <p className="text-[10px] font-bold opacity-40">Pontua├º├úo</p>
                                                 </div>
                                             </div>
                                         )
@@ -2092,7 +2058,7 @@ Pergunta do Aluno: ${query}`;
                             )}
                         </div>
 
-                        {/* Gestão de Professores — Somente ADM */}
+                        {/* Gest├úo de Professores ÔÇö Somente ADM */}
                         {isAdmin && (
                             <div className="bg-estuda-surface p-6 sm:p-8 rounded-[2.5rem] border border-estuda-primary/10 shadow-lg">
                                 <div className="flex items-center justify-between mb-6">
@@ -2153,14 +2119,14 @@ Pergunta do Aluno: ${query}`;
                                         </div>
                                         <div className="flex-1">
                                             <p className="text-xs font-bold">{authEmails.length} Professores Autorizados</p>
-                                            <p className="text-[10px] opacity-40 font-medium">Os e-mails nesta lista serão promovidos automaticamente ao se cadastrarem.</p>
+                                            <p className="text-[10px] opacity-40 font-medium">Os e-mails nesta lista ser├úo promovidos automaticamente ao se cadastrarem.</p>
                                         </div>
                                     </div>
                                 )}
                             </div>
                         )}
 
-                        {/* Gestão Global de Usuários — Somente SUPER ADM (Arlei) */}
+                        {/* Gest├úo Global de Usu├írios ÔÇö Somente SUPER ADM (Arlei) */}
                         {isSuperAdmin && (
                             <div className="bg-estuda-surface p-6 sm:p-8 rounded-[2.5rem] border border-yellow-500/20 shadow-[0_0_30px_rgba(234,179,8,0.05)]">
                                 <div className="flex items-center justify-between mb-6">
@@ -2173,25 +2139,29 @@ Pergunta do Aluno: ${query}`;
                                                 </span>
                                             )}
                                         </div>
-                                        <h3 className="text-lg font-black">Gerenciar Todos os Usuários</h3>
+                                        <h3 className="text-lg font-black">Gerenciar Todos os Usu├írios</h3>
                                     </div>
                                     <button 
-                                        onClick={() => setShowAdminDashboard(true)}
+                                        onClick={() => {
+                                            const newState = !isManagingUsers
+                                            setIsManagingUsers(newState)
+                                            if (newState) fetchUsersList()
+                                        }}
                                         className="text-[10px] font-black uppercase tracking-widest text-yellow-500 hover:underline"
                                     >
-                                        Acessar Painel Master
+                                        {isManagingUsers ? 'Ocultar Lista' : 'Ver Todos'}
                                     </button>
                                 </div>
 
-                                    {/* Contador de Usuários Moderno */}
+                                    {/* Contador de Usu├írios Moderno */}
                                     <div className="flex items-center justify-between bg-yellow-500/5 border border-yellow-500/10 p-5 rounded-[2rem] mb-6">
                                         <div className="flex items-center gap-4">
                                             <div className="size-12 rounded-[1.25rem] bg-yellow-500 flex items-center justify-center text-black shadow-lg shadow-yellow-500/20">
                                                 <Users size={24} />
                                             </div>
                                             <div>
-                                                <h4 className="text-sm font-black text-white leading-none mb-1">Total de Acadêmicos</h4>
-                                                <p className="text-[10px] text-yellow-500/60 font-bold uppercase tracking-widest">Base de Dados Estuda Aí</p>
+                                                <h4 className="text-sm font-black text-white leading-none mb-1">Total de Acad├¬micos</h4>
+                                                <p className="text-[10px] text-yellow-500/60 font-bold uppercase tracking-widest">Base de Dados Estuda A├¡</p>
                                             </div>
                                         </div>
                                         <div className="text-3xl font-black text-white tabular-nums">
@@ -2199,15 +2169,65 @@ Pergunta do Aluno: ${query}`;
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-4 bg-estuda-bg/30 p-4 rounded-3xl border border-white/5">
-                                        <div className="size-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center text-yellow-500">
-                                            <Users size={24} />
+                                    {isManagingUsers ? (
+                                        <div className="flex flex-col gap-4 animate-fade-in max-h-[400px] overflow-y-auto pr-2 custom-scrollbar scroll-smooth">
+                                            {loading && usersList.length === 0 ? (
+                                                <div className="flex flex-col items-center justify-center py-8 gap-3">
+                                                    <Loader2 size={24} className="text-yellow-500 animate-spin" />
+                                                    <p className="text-[10px] opacity-30 font-bold uppercase tracking-widest text-white/40">Carregando usu├írios...</p>
+                                                </div>
+                                            ) : usersList.length === 0 ? (
+                                                <p className="text-[10px] text-center opacity-30 italic py-4 font-bold uppercase tracking-widest text-white/40">Nenhum usu├írio encontrado</p>
+                                            ) : (
+                                                usersList.map(u => (
+                                                    <div key={u.id} className="flex items-center justify-between bg-estuda-bg/50 p-4 rounded-2xl border border-white/5 group hover:border-yellow-500/40 transition-all">
+                                                        <div className="flex items-center gap-4 min-w-0">
+                                                            <div className="size-10 rounded-2xl bg-estuda-primary/10 flex items-center justify-center border border-estuda-primary/10 overflow-hidden shrink-0">
+                                                                {u.avatar_url ? (
+                                                                    <img src={u.avatar_url} alt="" className="size-full object-cover" />
+                                                                ) : (
+                                                                    <User size={18} className="text-estuda-primary" />
+                                                                )}
+                                                            </div>
+                                                            <div className="flex flex-col min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-sm font-black text-white truncate">{u.name || 'Sem Nome'}</span>
+                                                                    {u.role === 'admin' && (
+                                                                        <span className="text-[8px] font-black uppercase tracking-tighter bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded-md border border-yellow-500/20 shrink-0">ADM</span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 ${u.role === 'admin' ? 'bg-red-500/20 text-red-400' : u.role === 'professor' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>
+                                                                        {u.role || 'estudante'}
+                                                                    </span>
+                                                                    <span className="text-[8px] opacity-20 font-bold text-white whitespace-nowrap">ID: {u.id.substring(0, 8)}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        {u.email !== 'arlei85@hotmail.com' && isSuperAdmin && (
+                                                            <button 
+                                                                onClick={() => deleteUser(u.id, u.name || u.email)}
+                                                                className="p-2 text-red-400 opacity-40 group-hover:opacity-100 transition-all hover:bg-red-400/10 rounded-xl"
+                                                                title="Excluir Usu├írio"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))
+                                            )}
                                         </div>
-                                        <div className="flex-1 text-xs">
-                                            <p className="font-bold text-white">Painel de Controle Profundo</p>
-                                            <p className="opacity-60 text-white">Clique em "Acessar Painel Master" acima para acessar relatórios completos, auditar contas e gerar exclusões automáticas.</p>
+                                    ) : (
+                                        <div className="flex items-center gap-4 bg-estuda-bg/30 p-4 rounded-3xl border border-white/5 opacity-60">
+                                            <div className="size-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+                                                <Users size={24} />
+                                            </div>
+                                            <div className="flex-1 text-xs">
+                                                <p className="font-bold text-white">Painel de Controle de Usu├írios</p>
+                                                <p className="opacity-60 text-white">Visualize, filtre e gerencie permanentemente todos os cadastros do app.</p>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                             </div>
                         )}
                     </section>
@@ -2217,7 +2237,7 @@ Pergunta do Aluno: ${query}`;
 
             </main>
 
-            {/* Modal Gerenciar Carrossel — somente ADM */}
+            {/* Modal Gerenciar Carrossel ÔÇö somente ADM */}
             {showCarouselManager && isAdmin && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowCarouselManager(false)}></div>
@@ -2256,7 +2276,7 @@ Pergunta do Aluno: ${query}`;
                                 onChange={e => setNewSlideUrl(e.target.value)}
                                 className="bg-estuda-bg border border-estuda-primary/10 rounded-2xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-estuda-primary/50 text-white placeholder:text-white/20"
                             />
-                            <label className="text-xs font-black uppercase tracking-widest opacity-60">Legenda (título do slide)</label>
+                            <label className="text-xs font-black uppercase tracking-widest opacity-60">Legenda (t├¡tulo do slide)</label>
                             <input
                                 type="text"
                                 placeholder="Ex: Bons estudos!"
@@ -2319,13 +2339,13 @@ Pergunta do Aluno: ${query}`;
                             <h3 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
                                 <FileQuestion size={24} className="text-estuda-primary" /> Nova Prova
                             </h3>
-                            <button type="button" onClick={() => setShowExamForm(false)} className="p-2 rounded-xl hover:bg-white/5 opacity-50 hover:opacity-100 transition-all font-bold text-sm text-white">✕</button>
+                            <button type="button" onClick={() => setShowExamForm(false)} className="p-2 rounded-xl hover:bg-white/5 opacity-50 hover:opacity-100 transition-all font-bold text-sm text-white">Ô£ò</button>
                         </div>
 
                         <form onSubmit={handleAddExam} className="flex flex-col gap-4">
-                            {/* Título */}
+                            {/* T├¡tulo */}
                             <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Título da Prova *</label>
+                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">T├¡tulo da Prova *</label>
                                 <div className="relative group">
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-estuda-primary transition-colors">
                                         <FileText size={18} />
@@ -2333,7 +2353,7 @@ Pergunta do Aluno: ${query}`;
                                     <input
                                         required
                                         type="text"
-                                        placeholder="Ex: P1 — Prova do 1º Bimestre"
+                                        placeholder="Ex: P1 ÔÇö Prova do 1┬║ Bimestre"
                                         value={newExam.title}
                                         onChange={e => setNewExam({ ...newExam, title: e.target.value })}
                                         className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors placeholder:text-white/20 text-white"
@@ -2341,9 +2361,9 @@ Pergunta do Aluno: ${query}`;
                                 </div>
                             </div>
 
-                            {/* Matéria */}
+                            {/* Mat├®ria */}
                             <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Nome da Matéria *</label>
+                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Nome da Mat├®ria *</label>
                                 <div className="relative group">
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-estuda-primary transition-colors">
                                         <BookOpen size={18} />
@@ -2367,7 +2387,7 @@ Pergunta do Aluno: ${query}`;
                                         <MessageSquare size={18} />
                                     </div>
                                     <textarea
-                                        placeholder="Ex: Contratos de Trabalho (arts. 2–11 CLT), Caps. 1 a 4..."
+                                        placeholder="Ex: Contratos de Trabalho (arts. 2ÔÇô11 CLT), Caps. 1 a 4..."
                                         value={newExam.subtitle}
                                         onChange={e => setNewExam({ ...newExam, subtitle: e.target.value })}
                                         className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors placeholder:text-white/20 text-white min-h-[100px] resize-y"
@@ -2422,13 +2442,13 @@ Pergunta do Aluno: ${query}`;
                 </div>
             )}
 
-            {/* Modal Adicionar Matéria */}
+            {/* Modal Adicionar Mat├®ria */}
             {showSubjectForm && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowSubjectForm(false)}></div>
                     <div className="bg-estuda-surface border border-estuda-primary/20 p-6 sm:p-8 rounded-[2.5rem] shadow-2xl w-full max-w-sm relative z-10 animate-fade-in flex flex-col overflow-y-auto" style={{ maxHeight: '90vh' }}>
                         <h3 className="text-xl sm:text-2xl font-black mb-6 text-white flex items-center gap-2">
-                            <Plus size={24} className="text-estuda-primary" /> Nova Matéria
+                            <Plus size={24} className="text-estuda-primary" /> Nova Mat├®ria
                         </h3>
 
                         <form onSubmit={handleAddSubjectSubmit} className="flex flex-col gap-6">
@@ -2450,7 +2470,7 @@ Pergunta do Aluno: ${query}`;
                             </div>
 
                             <div>
-                                <label className="block text-xs font-black uppercase tracking-widest opacity-60 mb-3 pl-2">Ícone Temático</label>
+                                <label className="block text-xs font-black uppercase tracking-widest opacity-60 mb-3 pl-2">├ìcone Tem├ítico</label>
                                 <div className="grid grid-cols-4 gap-3 bg-estuda-bg/50 p-4 rounded-3xl border border-estuda-primary/5">
                                     {SUBJECT_ICONS.map(icon => (
                                         <button
@@ -2485,7 +2505,7 @@ Pergunta do Aluno: ${query}`;
                 </div>
             )}
 
-            {/* Modal Seleção de Documento para Ações de IA */}
+            {/* Modal Sele├º├úo de Documento para A├º├Áes de IA */}
             {showDocSelect && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowDocSelect(false)}></div>
@@ -2494,7 +2514,7 @@ Pergunta do Aluno: ${query}`;
                             <Layers size={24} className="text-estuda-primary" /> Selecione o Material
                         </h3>
                         
-                        <p className="text-xs font-bold text-white/60 mb-6 px-2">Escolha qual material deve ser a base principal para esta ação ou use todos os documentos do professor.</p>
+                        <p className="text-xs font-bold text-white/60 mb-6 px-2">Escolha qual material deve ser a base principal para esta a├º├úo ou use todos os documentos do professor.</p>
 
                         <div className="flex flex-col gap-3">
                             <button
@@ -2506,7 +2526,7 @@ Pergunta do Aluno: ${query}`;
                                 </div>
                                 <div>
                                     <p className="font-black text-sm text-white">Todos os Materiais</p>
-                                    <p className="text-[10px] uppercase font-bold text-estuda-primary opacity-60">Visão Geral Completa</p>
+                                    <p className="text-[10px] uppercase font-bold text-estuda-primary opacity-60">Vis├úo Geral Completa</p>
                                 </div>
                             </button>
 
@@ -2523,7 +2543,7 @@ Pergunta do Aluno: ${query}`;
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="font-bold text-sm text-white truncate">{file.name}</p>
-                                        <p className="text-[10px] uppercase font-bold text-white/30 truncate">Material Específico</p>
+                                        <p className="text-[10px] uppercase font-bold text-white/30 truncate">Material Espec├¡fico</p>
                                     </div>
                                 </button>
                             ))}
@@ -2547,24 +2567,24 @@ Pergunta do Aluno: ${query}`;
                         <button 
                             onClick={() => setShowDevPopup(false)}
                             className="absolute top-6 right-6 p-2 rounded-xl hover:bg-white/5 opacity-50 hover:opacity-100 transition-all font-bold text-sm text-white"
-                        >✕</button>
+                        >Ô£ò</button>
                         
                         <div className="relative mb-6">
                             <div className="absolute inset-0 bg-estuda-primary blur-[40px] opacity-20 rounded-full" />
                             <img 
                                 src="https://i.supaimg.com/ab10c538-a9f0-4a7a-9c0d-5a65ded30e00/01193380-dc6a-41e9-835c-5598b06bfeca.jpg" 
-                                alt="Arlei Silvério" 
+                                alt="Arlei Silv├®rio" 
                                 className="size-32 sm:size-40 rounded-[3rem] border-4 border-estuda-surface object-cover relative z-10 shadow-2xl"
                             />
                         </div>
 
-                        <h3 className="text-2xl sm:text-3xl font-black text-white mb-1">Arlei Silvério</h3>
+                        <h3 className="text-2xl sm:text-3xl font-black text-white mb-1">Arlei Silv├®rio</h3>
                         <p className="text-estuda-primary font-black text-xs uppercase tracking-[0.2em] mb-6">Idealizador & Desenvolvedor</p>
                         
                         <div className="w-full h-px bg-white/10 mb-6" />
 
                         <p className="text-sm sm:text-base leading-relaxed text-white/70 font-medium mb-8 text-center italic px-4">
-                            "Focado em transformar a educação através da tecnologia e inteligência artificial de ponta."
+                            "Focado em transformar a educa├º├úo atrav├®s da tecnologia e intelig├¬ncia artificial de ponta."
                         </p>
 
                         <div className="flex flex-col sm:flex-row gap-4 w-full">
@@ -2577,7 +2597,7 @@ Pergunta do Aluno: ${query}`;
                             </a>
                         </div>
                         
-                        <p className="mt-8 text-[9px] font-black uppercase tracking-widest opacity-20">Estuda.A — © 2026 Todos os Direitos Reservados</p>
+                        <p className="mt-8 text-[9px] font-black uppercase tracking-widest opacity-20">Estuda.A ÔÇö ┬® 2026 Todos os Direitos Reservados</p>
                     </div>
                 </div>
             )}
@@ -2590,9 +2610,9 @@ Pergunta do Aluno: ${query}`;
                         <div className="size-16 bg-estuda-primary/10 rounded-full flex items-center justify-center mb-6 border border-estuda-primary/20">
                             <Fingerprint className="text-estuda-primary" size={32} />
                         </div>
-                        <h3 className="text-xl font-black text-white mb-2">Acesso Rápido</h3>
+                        <h3 className="text-xl font-black text-white mb-2">Acesso R├ípido</h3>
                         <p className="text-sm text-white/40 font-medium mb-8">
-                            Deseja ativar o acesso por biometria (digital ou rosto) para entrar mais rápido no Estuda Aí?
+                            Deseja ativar o acesso por biometria (digital ou rosto) para entrar mais r├ípido no Estuda A├¡?
                         </p>
                         <div className="w-full flex flex-col gap-3">
                             <button
@@ -2605,7 +2625,7 @@ Pergunta do Aluno: ${query}`;
                                 onClick={() => setShowBiometryInvite(false)}
                                 className="w-full bg-white/5 text-white/40 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all"
                             >
-                                AGORA NÃO
+                                AGORA N├âO
                             </button>
                         </div>
                     </div>
@@ -2621,10 +2641,6 @@ Pergunta do Aluno: ${query}`;
                     animation: scale-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
                 }
             `}</style>
-            {/* Dashboard Master Admin */}
-            {showAdminDashboard && isAdmin && (
-                <AdminDashboard onClose={() => setShowAdminDashboard(false)} />
-            )}
         </div>
     )
 }

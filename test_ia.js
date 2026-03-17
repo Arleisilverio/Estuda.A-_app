@@ -23,11 +23,25 @@ async function test() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ message: "Olá IA", documentIds: [] })
+        body: JSON.stringify({ query: "O que é Direito Civil?", subjectId: null, messages: [] })
     })
 
     console.log('Status ask-ai:', res.status)
-    console.log('Body ask-ai:', await res.text())
+    const askAiResult = await res.text()
+    console.log('Body ask-ai:', askAiResult)
+
+    console.log("---- TESTANDO GENERATE-QUIZ ----")
+    const resQuiz = await fetch(`${supabaseUrl}/functions/v1/generate-quiz`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ subjectId: "test-subject", subjectName: "Direito Penal" })
+    })
+    console.log('Status generate-quiz:', resQuiz.status)
+    const quizResult = await resQuiz.text()
+    console.log('Body generate-quiz:', quizResult)
 
     console.log("---- TESTANDO PROCESS-DOCUMENT ----")
     const res2 = await fetch(`${supabaseUrl}/functions/v1/process-document`, {
