@@ -154,7 +154,7 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                 name: editProfileName,
                 subject_id: subjId,
                 avatar_url: editProfileAvatar,
-                phone_number: 'PENDENTE_' + session.user.id.slice(0, 8)
+                phone_number: `PROF_${session.user.id.slice(0, 8)}_${subjId}`
             }))
 
             const { error } = await supabase
@@ -288,7 +288,7 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                 name: onboardingName,
                 subject_id: subjId,
                 avatar_url: onboardingAvatar,
-                phone_number: 'PENDENTE_' + session.user.id.slice(0, 8)
+                phone_number: `PROF_${session.user.id.slice(0, 8)}_${subjId}`
             }))
 
             const { error } = await supabase
@@ -567,6 +567,10 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                     <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-estuda-primary opacity-60 mb-1">Acesso Educador</p>
                         <h1 className="text-lg sm:text-2xl font-black text-white leading-tight">Olá, Prof. {professorInfo.name.split(' ')[0]}</h1>
+                        <p className="text-[10px] font-bold text-white/40 uppercase tracking-tighter mt-1 flex items-center gap-2">
+                            <Book size={10} className="text-estuda-primary" />
+                            {subjects.map(s => s.name).join(' • ')}
+                        </p>
                     </div>
                 </div>
 
@@ -643,65 +647,49 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                     </button>
                 </div>
             </header>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1">
-                {/* Coluna Esquerda: Matérias e Files */}
+            
+            <main className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 mt-8">
+                {/* Coluna Esquerda: Documentos e Notas */}
                 <div className="lg:col-span-4 flex flex-col gap-6">
-                    {/* Seleção de Matéria */}
-                    <div className="bg-estuda-surface border border-estuda-primary/10 rounded-[2rem] p-6 shadow-lg">
-                        <h3 className="text-sm font-black uppercase tracking-widest opacity-50 mb-4 pl-1">Minhas Matérias</h3>
-                        <div className="flex flex-col gap-2">
+                    {/* Lista de Matérias Selecionável (Estilo Compacto) */}
+                    <div className="bg-estuda-surface border border-estuda-primary/10 rounded-[2.5rem] p-6 shadow-lg">
+                        <select 
+                            value={selectedSubject?.id || ''} 
+                            onChange={(e) => {
+                                const subj = subjects.find(s => s.id === parseInt(e.target.value))
+                                if (subj) setSelectedSubject(subj)
+                            }}
+                            className="w-full bg-estuda-bg border border-estuda-primary/20 rounded-2xl p-4 text-sm font-black text-white focus:outline-none focus:ring-2 focus:ring-estuda-primary/30 transition-all appearance-none cursor-pointer mb-4"
+                        >
                             {subjects.map(s => (
-                                <button
-                                    key={s.id}
-                                    onClick={() => setSelectedSubject(s)}
-                                    className={`flex flex-col items-start p-4 rounded-2xl transition-all border-2 ${
-                                        selectedSubject?.id === s.id 
-                                        ? 'bg-estuda-primary border-estuda-primary/20 shadow-lg' 
-                                        : 'bg-estuda-bg border-transparent hover:border-estuda-primary/30'
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between w-full">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-2xl">{s.icon_name}</span>
-                                            <span className="font-bold text-sm">{s.name}</span>
-                                        </div>
-                                        <ChevronRight size={16} className={selectedSubject?.id === s.id ? 'opacity-100' : 'opacity-20'} />
-                                    </div>
-                                    {selectedSubject?.id === s.id && (
-                                        <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-white/5 mt-4 w-full">
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation(); // Prevent triggering setSelectedSubject
-                                                    setNewExam({ ...newExam, subject: selectedSubject?.name || '' })
-                                                    setShowExamForm(true)
-                                                }}
-                                                className="flex-1 bg-estuda-primary/10 border border-estuda-primary/20 text-estuda-primary py-3 rounded-2xl font-black text-[10px] uppercase tracking-wider hover:bg-estuda-primary/20 transition-all flex items-center justify-center gap-2"
-                                            >
-                                                <Calendar size={14} /> Agendar Prova
-                                            </button>
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation(); // Prevent triggering setSelectedSubject
-                                                    handleGenerateExam(s)
-                                                }}
-                                                disabled={isGeneratingExam}
-                                                className="flex-1 bg-estuda-primary text-white py-3 rounded-2xl font-black text-[10px] uppercase tracking-wider hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-estuda-primary/20 flex items-center justify-center gap-2 disabled:opacity-50"
-                                            >
-                                                {isGeneratingExam ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                                                Gerar Prova com IA
-                                            </button>
-                                        </div>
-                                    )}
-                                </button>
+                                <option key={s.id} value={s.id}>{s.icon_name} {s.name}</option>
                             ))}
+                        </select>
+
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-center justify-between px-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-estuda-primary">Anotações para a Turma</label>
+                                <button 
+                                    onClick={handleUpdateNote}
+                                    disabled={savingNote || !selectedSubject}
+                                    className="text-[9px] font-black uppercase bg-estuda-primary/10 text-estuda-primary px-3 py-1.5 rounded-xl hover:bg-estuda-primary/20 transition-all disabled:opacity-30"
+                                >
+                                    {savingNote ? 'Salvando...' : 'Salvar'}
+                                </button>
+                            </div>
+                            <textarea
+                                value={professorNote}
+                                onChange={e => setProfessorNote(e.target.value)}
+                                placeholder="Dicas e avisos importantes para os alunos..."
+                                className="w-full bg-estuda-bg/50 border border-estuda-primary/5 rounded-[1.5rem] p-4 text-xs font-medium focus:outline-none focus:border-estuda-primary/30 transition-all placeholder:text-white/10 text-white/80 min-h-[120px] resize-none"
+                            />
                         </div>
                     </div>
 
-                    {/* Upload Area */}
-                    <div className="bg-estuda-surface border border-estuda-primary/10 rounded-[2rem] p-6 shadow-lg">
-                        <h3 className="text-sm font-black uppercase tracking-widest opacity-50 mb-4 pl-1">Nutrir Conhecimento</h3>
-                        <label className="flex flex-col items-center justify-center p-8 rounded-3xl border-2 border-dashed border-estuda-primary/20 bg-estuda-bg hover:bg-estuda-primary/5 hover:border-estuda-primary/50 transition-all cursor-pointer text-center group">
+                    {/* Materiais e Upload */}
+                    <div className="bg-estuda-surface border border-estuda-primary/10 rounded-[2.5rem] p-6 shadow-lg">
+                        <h3 className="text-sm font-black uppercase tracking-widest opacity-50 mb-4 pl-1">Materiais de Estudo</h3>
+                        <label className="flex flex-col items-center justify-center p-8 rounded-[2rem] border-2 border-dashed border-estuda-primary/20 bg-estuda-bg hover:bg-estuda-primary/5 hover:border-estuda-primary/50 transition-all cursor-pointer text-center group mb-6">
                             <input type="file" className="hidden" accept=".pdf" onChange={handleFileUpload} disabled={uploading} />
                             {uploading ? (
                                 <Loader2 className="animate-spin text-estuda-primary mb-3" size={32} />
@@ -712,44 +700,38 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                             <span className="text-[10px] opacity-40 mt-1 uppercase font-bold tracking-tighter">Máximo 10MB</span>
                         </label>
 
-                        {/* Lista de Arquivos */}
-                        <div className="mt-8">
-                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 mb-4">Materiais Ativos</h4>
-                            <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                                {documents.map(doc => (
-                                    <div key={doc.id} className="flex items-center justify-between bg-estuda-bg p-3 rounded-xl border border-white/5">
-                                        <div className="flex items-center gap-3 overflow-hidden">
-                                            <FileText size={16} className="text-estuda-primary shrink-0" />
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-bold text-white truncate">{doc.name}</p>
-                                                <p className="text-[10px] opacity-40 font-bold uppercase tracking-widest">
-                                                    {doc.status === 'ready' ? 'Processado' : 'Processando IA...'}
-                                                </p>
-                                            </div>
+                        <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                            {documents.map(doc => (
+                                <div key={doc.id} className="flex items-center justify-between bg-estuda-bg p-3 rounded-2xl border border-white/5 group">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <FileText size={16} className="text-estuda-primary shrink-0" />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-white truncate">{doc.name}</p>
+                                            <p className="text-[9px] opacity-40 font-bold uppercase tracking-widest">
+                                                {doc.status === 'ready' ? 'Processado' : 'Processando IA...'}
+                                            </p>
                                         </div>
-                                        <button
-                                            onClick={() => handleDeleteDocument(doc)}
-                                            className="p-2 text-red-500/40 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
-                                            title="Excluir Material"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
                                     </div>
-                                ))}
-                                {documents.length === 0 && (
-                                    <p className="text-[10px] text-center opacity-30 italic">Nenhum arquivo nesta matéria</p>
-                                )}
-                            </div>
+                                    <button
+                                        onClick={() => handleDeleteDocument(doc)}
+                                        className="p-2 text-red-500/40 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                            {documents.length === 0 && (
+                                <p className="text-[10px] text-center opacity-30 italic py-4">Nenhum arquivo nesta matéria</p>
+                            )}
                         </div>
                     </div>
-                    {/* Removed the standalone "Agendar Nova Prova" button */}
 
-                    {/* Lista de Provas Agendadas pelo Professor */}
-                    <div className="bg-estuda-surface border border-estuda-primary/10 rounded-[2rem] p-6 shadow-lg">
+                    {/* Provas Agendadas */}
+                    <div className="bg-estuda-surface border border-estuda-primary/10 rounded-[2.5rem] p-6 shadow-lg">
                         <h3 className="text-sm font-black uppercase tracking-widest opacity-50 mb-4 pl-1">Provas Agendadas</h3>
-                        <div className="flex flex-col gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                        <div className="flex flex-col gap-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                             {exams.length === 0 ? (
-                                <p className="text-[10px] text-center opacity-30 italic py-4">Nenhuma prova agendada para esta matéria</p>
+                                <p className="text-[10px] text-center opacity-30 italic py-4">Nenhuma prova agendada</p>
                             ) : (
                                 exams.map(exam => (
                                     <div key={exam.id} className="bg-estuda-bg p-4 rounded-2xl border border-white/5 relative group">
@@ -788,47 +770,46 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                 <div className="lg:col-span-8 flex flex-col bg-estuda-surface border border-estuda-primary/10 rounded-[2.5rem] shadow-2xl overflow-hidden min-h-[600px]">
                     <div className="p-6 border-b border-estuda-primary/10 flex items-center justify-between bg-white/[0.02]">
                         <div className="flex items-center gap-3">
-                            <Sparkles className="text-estuda-primary" size={20} />
+                            <div className="p-2 bg-estuda-primary/10 rounded-xl text-estuda-primary">
+                                <Sparkles size={20} />
+                            </div>
                             <div>
-                                <h3 className="text-sm font-bold">Assistente de Curadoria</h3>
-                                <p className="text-[10px] opacity-50 font-medium">Valide se o Professor Virtual aprendeu o conteúdo corretamente</p>
+                                <h3 className="text-sm font-black text-white">{selectedSubject?.name || 'Selecione uma Matéria'}</h3>
+                                <p className="text-[10px] opacity-50 font-bold uppercase tracking-widest">Validação do Professor Virtual</p>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="px-6 py-4 bg-estuda-bg/20 border-b border-estuda-primary/10">
-                        <div className="flex items-center justify-between mb-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-estuda-primary">Anotações para os Alunos</label>
+                        <div className="flex items-center gap-3">
                             <button 
-                                onClick={handleUpdateNote}
-                                disabled={savingNote || !selectedSubject}
-                                className="text-[9px] font-black uppercase bg-estuda-primary/10 text-estuda-primary px-3 py-1 rounded-lg hover:bg-estuda-primary/20 disabled:opacity-30 transition-all"
+                                onClick={() => handleGenerateExam(selectedSubject)}
+                                disabled={isGeneratingExam || !selectedSubject}
+                                className="bg-estuda-primary text-white px-4 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-wider hover:scale-105 active:scale-95 transition-all shadow-lg shadow-estuda-primary/20 flex items-center gap-2 disabled:opacity-50"
                             >
-                                {savingNote ? 'Salvando...' : 'Salvar Alterações'}
+                                {isGeneratingExam ? <Loader2 size={12} className="animate-spin" /> : <Layers size={12} />}
+                                CRIAR QUIZ (10)
                             </button>
                         </div>
-                        <textarea
-                            value={professorNote}
-                            onChange={e => setProfessorNote(e.target.value)}
-                            placeholder="Anote aqui dicas, pontos da prova ou avisos importantes para sua turma..."
-                            className="w-full bg-estuda-bg/50 border border-estuda-primary/5 rounded-xl p-3 text-xs font-medium focus:outline-none focus:border-estuda-primary/30 transition-colors placeholder:text-white/10 text-white/80 min-h-[80px] resize-none"
-                        />
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-estuda-bg/10">
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-estuda-bg/5">
                         {messages.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-center p-12 opacity-30">
                                 <MessageSquare size={48} className="mb-4" />
-                                <h4 className="text-lg font-bold mb-2">Inicie a Validação</h4>
-                                <p className="text-xs max-w-xs font-medium">Pergunte coisas como \"Faça um resumo dos pontos principais\" ou \"Crie 3 perguntas com base neste PDF\" para testar o conhecimento da IA.</p>
+                                <h4 className="text-lg font-black mb-2 uppercase tracking-widest">Inicie a Validação</h4>
+                                <p className="text-xs max-w-xs font-bold leading-relaxed px-4 opacity-60">Teste se a IA aprendeu corretamente o conteúdo dos seus PDFs antes de liberar para os alunos.</p>
+                                
+                                <div className="mt-8 grid grid-cols-2 gap-3 w-full max-w-sm">
+                                    <button onClick={() => setQuery("Gere um resumo dos meus materiais")} className="p-3 bg-white/5 border border-white/5 rounded-2xl text-[10px] font-black hover:bg-white/10 transition-all uppercase">Gere um resumo</button>
+                                    <button onClick={() => setQuery("Crie 3 perguntas difíceis")} className="p-3 bg-white/5 border border-white/5 rounded-2xl text-[10px] font-black hover:bg-white/10 transition-all uppercase">Crie perguntas</button>
+                                </div>
                             </div>
                         ) : (
                             messages.map((msg, i) => (
                                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-                                    <div className={`p-4 rounded-2xl max-w-[85%] text-sm leading-relaxed shadow-lg ${
+                                    <div className={`p-5 rounded-3xl max-w-[85%] text-sm leading-relaxed shadow-xl ${
                                         msg.role === 'user' 
                                         ? 'bg-estuda-primary text-white ml-12 rounded-tr-none' 
-                                        : 'bg-estuda-surface border border-estuda-primary/10 mr-12 rounded-tl-none'
+                                        : 'bg-estuda-surface border border-white/5 mr-12 rounded-tl-none font-medium'
                                     }`}>
                                         {msg.content}
                                     </div>
@@ -837,27 +818,33 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                         )}
                         {loading && (
                             <div className="flex justify-start animate-pulse">
-                                <div className="bg-estuda-surface border border-estuda-primary/10 p-4 rounded-2xl rounded-tl-none flex items-center gap-3">
+                                <div className="bg-estuda-surface border border-white/5 p-4 rounded-3xl rounded-tl-none flex items-center gap-3">
                                     <Loader2 className="animate-spin text-estuda-primary" size={16} />
-                                    <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Pensando...</span>
+                                    <span className="text-[9px] font-black uppercase tracking-widest opacity-40">Processando conhecimento...</span>
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    <div className="p-6 bg-estuda-bg/50 border-t border-estuda-primary/10">
+                    <div className="p-6 bg-estuda-bg/30 border-t border-white/5">
                         <div className="flex gap-3">
                             <div className="flex-1 relative">
                                 <input 
                                     type="text" 
-                                    placeholder="Pergunte ao Professor Virtual sobre o conteúdo..."
+                                    placeholder="Pergunte sobre seus materiais..."
                                     value={query}
                                     onChange={e => setQuery(e.target.value)}
                                     onKeyPress={e => e.key === 'Enter' && handleAskIA()}
-                                    className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl py-4 px-6 text-sm focus:outline-none focus:ring-2 focus:ring-estuda-primary/20 transition-all font-medium placeholder:text-white/20"
+                                    className="w-full bg-estuda-bg border border-white/10 rounded-2xl py-5 px-6 text-sm focus:outline-none focus:ring-2 focus:ring-estuda-primary/20 transition-all font-bold placeholder:text-white/20"
                                 />
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-estuda-primary/10 rounded-xl text-estuda-primary">
-                                    <Layers size={18} />
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                    <button 
+                                        onClick={() => setShowExamForm(true)}
+                                        className="p-2 text-white/20 hover:text-estuda-primary transition-colors"
+                                        title="Agendar Prova Manualmente"
+                                    >
+                                        <Calendar size={18} />
+                                    </button>
                                 </div>
                             </div>
                             <button 
@@ -865,12 +852,12 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                                 disabled={loading || !query.trim()}
                                 className="bg-estuda-primary text-white size-14 rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-estuda-primary/30 disabled:opacity-50"
                             >
-                                <ChevronRight size={24} />
+                                <ChevronRight size={28} />
                             </button>
                         </div>
                     </div>
                 </div>
-            </div>
+            </main>
 
             {/* Modal de Agendamento de Prova */}
             {showExamForm && (
