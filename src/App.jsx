@@ -831,8 +831,13 @@ function App() {
         setLoading(true)
 
         try {
-            // Reinforce RAG constraints in the query itself to ensure the AI doesn't use external info
-            const ragQuery = `IMPORTANTE: RESPONDA APENAS COM BASE NOS MATERIAIS FORNECIDOS PELO PROFESSOR. NÃO USE SEU CONHECIMENTO PRÉVIO OU INTERNET. SE A INFORMAÇÃO NÃO ESTIVER NOS MATERIAIS, DIGA QUE NÃO ENCONTROU NO CONTEÚDO DA DISCIPLINA.
+            // Reinforce RAG constraints and structure in the query
+            const ragQuery = `IMPORTANTE: RESPONDA APENAS COM BASE NOS MATERIAIS FORNECIDOS PELO PROFESSOR.
+Responda de forma clara e profissional:
+- Use listas (•) para múltiplos pontos
+- Use negrito (**termo**) para conceitos chave
+- Use espaçamento duplo entre parágrafos
+- Se a informação não estiver nos materiais, diga que não encontrou no conteúdo da disciplina.
 
 Pergunta do Aluno: ${query}`;
 
@@ -1633,7 +1638,7 @@ Pergunta do Aluno: ${query}`;
                                                 key={idx}
                                                 className={`flex flex-col max-w-[85%] sm:max-w-[70%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'} animate-fade-in`}
                                             >
-                                                <div className={`p-4 sm:p-5 rounded-2xl text-xs sm:text-sm leading-relaxed max-w-full transition-all duration-500 relative ${
+                                                <div className={`p-4 sm:p-5 rounded-2xl text-xs sm:text-sm leading-relaxed max-w-full transition-all duration-500 relative whitespace-pre-wrap ${
                                                         msg.role === 'user'
                                                             ? 'bg-estuda-primary text-white font-medium shadow-lg'
                                                             : msg.type === 'summary' 

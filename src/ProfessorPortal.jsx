@@ -415,11 +415,20 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
         setLoading(true)
 
         try {
+            // Prompt refinado para melhor legibilidade e estruturação
+            const structuralPrompt = `Responda de forma clara e organizada:
+- Use listas para múltiplos itens
+- Use negrito para termos chave
+- Deixe espaços entre parágrafos
+- Se a informação estiver nos PDFs, cite-a. Se não, avise.
+
+Pergunta: ${query}`;
+
             const { data, error } = await supabase.functions.invoke('ask-ai', {
                 body: { 
-                    query, 
+                    query: structuralPrompt, 
                     subjectId: selectedSubject.id,
-                    mode: 'curation' // Um modo especial para o professor validar o conteúdo
+                    mode: 'curation' 
                 }
             })
 
@@ -806,7 +815,7 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                         ) : (
                             messages.map((msg, i) => (
                                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-                                    <div className={`p-5 rounded-3xl max-w-[85%] text-sm leading-relaxed shadow-xl ${
+                                    <div className={`p-5 rounded-3xl max-w-[85%] text-sm leading-relaxed shadow-xl whitespace-pre-wrap ${
                                         msg.role === 'user' 
                                         ? 'bg-estuda-primary text-white ml-12 rounded-tr-none' 
                                         : 'bg-estuda-surface border border-white/5 mr-12 rounded-tl-none font-medium'
