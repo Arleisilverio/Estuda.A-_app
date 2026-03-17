@@ -601,12 +601,56 @@ function App() {
                 id: s.id, 
                 name: s.name, 
                 icon: s.icon_name,
-                professor_notes: s.professor_notes // Novo campo para anotações do professor
+                professor_notes: s.professor_notes,
+                notes_updated_at: s.notes_updated_at
             })))
         } catch (e) {
             console.error('Erro ao buscar matérias:', e)
         }
     }
+
+    // Inscrição em Tempo Real para Matérias (Notas do Professor)
+    useEffect(() => {
+        if (!session) return
+
+        const channel = supabase
+            .channel('public:subjects')
+            .on('postgres_changes', { 
+                event: 'UPDATE', 
+                schema: 'public', 
+                table: 'subjects' 
+            }, (payload) => {
+                console.log('Matéria atualizada em tempo real:', payload.new)
+                const updatedSubject = payload.new
+                
+                setSubjects(prev => prev.map(s => 
+                    s.id === updatedSubject.id 
+                    ? { 
+                        ...s, 
+                        professor_notes: updatedSubject.professor_notes,
+                        notes_updated_at: updatedSubject.notes_updated_at
+                      } 
+                    : s
+                ))
+
+                // Se a matéria atualizada for a selecionada, atualiza as notas na visualização
+                setSelectedSubject(prev => {
+                    if (prev && prev.id === updatedSubject.id) {
+                        return {
+                            ...prev,
+                            professor_notes: updatedSubject.professor_notes,
+                            notes_updated_at: updatedSubject.notes_updated_at
+                        }
+                    }
+                    return prev
+                })
+            })
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [session])
 
     const fetchCarouselImages = async () => {
         try {
