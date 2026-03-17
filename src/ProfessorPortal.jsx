@@ -23,8 +23,7 @@ import {
     Clock,
     Settings,
     Info,
-    ShieldCheck,
-    Camera
+    ShieldCheck
 } from 'lucide-react'
 
 export default function ProfessorPortal({ session, onLogout, isAdmin, setViewingProfessorPortal }) {
