@@ -342,18 +342,9 @@ function App() {
                 console.error('Erro ao buscar perfis do banco:', dbError)
             }
 
-            // 2. Chamar a Edge Function para pegar dados do Auth (como última data de login, se disponível)
+            // 2. Não usaremos mais Edge Function de user-management devido a erro sistêmico de JWT.
+            // Os dados virão primariamente da tabela profiles.
             let authUsers = []
-            try {
-                const { data: edgeData, error: edgeError } = await supabase.functions.invoke('user-management', {
-                    body: { action: 'list' }
-                })
-                if (!edgeError && edgeData) {
-                    authUsers = edgeData.users || (Array.isArray(edgeData) ? edgeData : [])
-                }
-            } catch (efErr) {
-                console.warn('Edge function user-management falhou, usando apenas banco de dados:', efErr)
-            }
 
             // 3. Mesclar dados
             // Priorizamos os perfis (quem já entrou no app), mas podemos achar e-mails do auth que não tem perfil ainda
@@ -411,10 +402,19 @@ function App() {
         
         setLoading(true)
         try {
-            const { error } = await supabase.functions.invoke('user-management', {
-                body: { action: 'delete', userId: targetUserId }
+            const { data, error } = await supabase.rpc('delete_user_account', {
+                user_id_to_delete: targetUserId
             })
-            if (error) throw error
+            if (error) {
+                console.error('---- ADMIN DELETE EXCEPTION LOG ----')
+                console.error('Error Object:', error)
+                if (error.message?.includes('could not find the function')) {
+                    alert('Erro: A função SQL de exclusão não foi instalada no Supabase.\nPor favor, execute o script SQL bypass_delete_user.sql no seu painel do Supabase.')
+                } else {
+                    alert('Erro ao excluir usuário: ' + error.message)
+                }
+                throw error
+            }
             alert('Usuário excluído com sucesso.')
             fetchUsersList()
         } catch (err) {
@@ -440,10 +440,19 @@ function App() {
                 event_type: 'deletion'
             })
 
-            const { error } = await supabase.functions.invoke('user-management', {
-                body: { action: 'delete' }
+            const { data, error } = await supabase.rpc('delete_user_account', {
+                user_id_to_delete: session.user.id
             })
-            if (error) throw error
+            if (error) {
+                console.error('---- EDGE FUNCTION EXCEPTION LOG ----')
+                console.error('Error Object:', error)
+                if (error.message?.includes('could not find the function')) {
+                    alert('Erro: A função SQL de exclusão não foi instalada no Supabase.\nPor favor, execute o script SQL bypass_delete_user.sql no seu painel do Supabase.')
+                } else {
+                    alert('Erro ao excluir usuário: ' + error.message)
+                }
+                throw error
+            }
             alert('Sua conta e todos os dados foram removidos com sucesso.')
             await supabase.auth.signOut()
         } catch (err) {

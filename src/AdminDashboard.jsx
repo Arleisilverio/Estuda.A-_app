@@ -98,11 +98,15 @@ export default function AdminDashboard({ onClose }) {
                 event_type: 'deletion'
             })
 
-            const { error } = await supabase.functions.invoke('user-management', {
-                body: { action: 'delete', userId: targetUser.id }
+            const { data, error } = await supabase.rpc('delete_user_account', {
+                user_id_to_delete: targetUser.id
             })
 
-            if (error) throw error
+            if (error) {
+                console.error('---- ADMIN DELETE DASHBOARD EXCEPTION LOG ----')
+                console.error('Error Object:', error)
+                throw error
+            }
             alert('Usuário removido com sucesso e evento registrado.')
             fetchData()
         } catch (err) {

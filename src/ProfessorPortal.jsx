@@ -178,9 +178,24 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
         
         try {
             setLoading(true)
-            await supabase.from('professors').delete().eq('user_id', session.user.id)
+            const { error } = await supabase.rpc('delete_user_account', {
+                user_id_to_delete: session.user.id
+            })
+            
+            if (error) {
+                console.error('Erro ao excluir conta via RPC:', error)
+                if (error.message?.includes('could not find the function')) {
+                    alert('Erro: A função SQL de exclusão não foi instalada.\nCopie e execute o script SQL fornecido no painel do Supabase.')
+                } else {
+                    alert('Erro ao excluir conta: ' + error.message)
+                }
+                return
+            }
+
+            alert('Sua conta de professor foi removida com sucesso.')
             await supabase.auth.signOut()
         } catch (err) {
+            console.error('Erro fatal ao excluir conta:', err)
             alert('Erro ao excluir conta. Por favor, entre em contato com o suporte.')
         } finally {
             setLoading(false)

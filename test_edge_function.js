@@ -9,7 +9,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 async function test() {
     const { data: sessionData, error: signInError } = await supabase.auth.signInWithPassword({
         email: 'arlei85@hotmail.com',
-        password: '123456' // Assuming this from typical testing
+        password: 'agz4897' // Updated from standard test password
     })
 
     if (signInError) {
