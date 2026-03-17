@@ -31,30 +31,33 @@ serve(async (req: Request) => {
     let query = supabase
        .from('document_chunks')
        .select('content, document_id, metadata')
-       .limit(150) // pegar uma boa qtde pra ter variedade
        
     // Se enviou o ID de 1 PDF para focar a prova apenas nele:
     if (documentId) {
        query = query.eq('document_id', documentId)
+    } else {
+       // Filtro direto no banco por subject_id no JSONB metadata
+       query = query.filter('metadata->>subject_id', 'eq', subjectId)
     }
 
-    const { data: documents, error: docError } = await query
+    const { data: documents, error: docError } = await query.limit(50)
 
-    // Filtro adicional de segurança por subjectId se não enviou documento específico
-    const filteredDocs = documentId ? (documents || []) : (documents?.filter((d: any) => {
-       return !d.metadata?.subject_id || d.metadata.subject_id === subjectId
-    }) || [])
+    if (docError) {
+      console.error('Erro ao buscar chunks:', docError)
+    }
+
+    const filteredDocs = documents || []
 
     // Embaralhar e pegar alguns aleatórios para n gerar sempre o msmo quiz
-    const shuffled = filteredDocs.sort(() => 0.5 - Math.random())
+    const shuffled = [...filteredDocs].sort(() => 0.5 - Math.random())
     const selectedDocs = shuffled.slice(0, 15) // limite de chunks no prompt
     
     let contextText = selectedDocs.map((doc: any) => doc.content).join('\n\n')
     let basedOnMaterials = true
 
     if (!contextText || filteredDocs.length === 0) {
-      console.log(`Nenhum fragmento encontrado para a matéria ${subjectId}.`)
-      contextText = `Nenhum material de apoio foi encontrado no sistema ou arquivou falhou no processamento. Você TEM QUE GERAR as perguntas unicamente com base no seu conhecimento geral avançado e acadêmico sobre a matéria: "${subjectName || 'Assuntos Acadêmicos'}"`
+      console.log(`Nenhum fragmento encontrado para a matéria ${subjectId}. Usando conhecimento geral.`)
+      contextText = `Nenhum material de apoio foi encontrado no sistema. Gere as perguntas com base no seu conhecimento acadêmico sobre: "${subjectName || 'Matéria Acadêmica'}"`
       basedOnMaterials = false
     }
 

@@ -57,69 +57,56 @@ serve(async (req: Request) => {
     if (!queryEmbedding) throw new Error('Falha ao gerar embedding da pergunta')
 
     // 2. Buscar chunks similares no banco (vector search usando match_document_chunks)
-    // Aumentamos o match_count para 20 para garantir que, após o filtro de subject_id no JS, 
-    // ainda tenhamos conteúdo relevante suficiente.
-    const matchThreshold = 0.1 
-    const matchCount = 20 
+    const matchThreshold = 0.2 // Aumentado um pouco para evitar ruído
+    const matchCount = 15 
 
     const { data: documents, error: matchError } = await supabase.rpc('match_document_chunks', {
-
       query_embedding: queryEmbedding,
       match_threshold: matchThreshold,
-      match_count: matchCount
+      match_count: matchCount,
+      filter_subject_id: subjectId // Novo filtro via RPC
     })
 
     if (matchError) {
-       console.error("Erro no supabase.rpc('match_document_chunks'):", matchError)
+       console.error("Erro RPC match_document_chunks:", matchError.message)
     }
 
-    console.log(`Chunks encontrados pela RPC match_document_chunks (threshold ${matchThreshold}): ${documents?.length || 0}`)
+    console.log(`Chunks encontrados via RPC (${subjectId}): ${documents?.length || 0}`)
     let contextText = ''
     let sourceMaterials = new Set()
 
     if (documents && documents.length > 0) {
-      // Filtrar via JS pra matéria atual, porque nem todo banco aceita passar subject pela RPC custom
-      const filteredDocs = subjectId ? documents.filter((d: any) => {
-          return !d.metadata?.subject_id || d.metadata.subject_id === subjectId
-      }) : documents;
-
-      console.log(`Chunks filtrados final por subjectId (${subjectId}): ${filteredDocs.length}`)
-
-      contextText = filteredDocs.map((doc: any) => {
+      contextText = documents.map((doc: any) => {
         if(doc.metadata && doc.metadata.name) sourceMaterials.add(doc.metadata.name)
         return doc.content
       }).join('\n\n')
     }
 
-    if (!contextText) {
-      contextText = "ATENÇÃO GPT: Você PRECISA informar ao usuário que não conseguiu encontrar a resposta nos materiais dele. Responda baseado no seu conhecimento geral, mas avise que NÃO VEIO DO MATERIAL."
+    const hasContext = !!contextText.trim();
+    if (!hasContext) {
+      contextText = "NENHUM MATERIAL ENCONTRADO NO BANCO DE DADOS PARA ESTA MATÉRIA NO MOMENTO."
     }
 
-    console.log(`Precedentes/Fontes incluídas no Prompt do RAG: ${Array.from(sourceMaterials).join(', ')}`)
-
     // 3. Formatar o prompt para o GPT-4o-mini
-    const systemPrompt = `Você é o Professor IA, um assistente virtual criado para ajudar alunos nos estudos.
-O usuário está consultando a matéria (ID: ${subjectId}).
+    const systemPrompt = `Você é o Professor IA da plataforma Estuda.AÍ.
+Seu objetivo é ajudar o aluno baseado nos materiais de estudo fornecidos abaixo.
+${hasContext ? 'Use as informações dos materiais para responder.' : 'AVISO: Não encontramos materiais específicos. Responda com seu conhecimento geral acadêmico, mas mencione que não encontrou nos arquivos da disciplina.'}
+Responda de forma clara, profissional e didática. Use Markdown.
 
-Você DEVE utilizar estritamente o contexto dos "Materiais de Estudo" baseados nos PDFs do aluno abaixo para embasar a sua resposta. 
-Se os materiais contiverem o nome do professor ou os dados da apostila, MENCIONE ISSO! Você é o professor dessa matéria.
-Responda SEMPRE EM PORTUGUÊS DO BRASIL. Formate a resposta usando markdown (negrito, listas).
-
-MATERIAIS DE ESTUDO (RETIRADOS DOS PDFs DO ALUNO):
+MATERIAIS DE ESTUDO:
 """
 ${contextText}
 """`
 
     const openaiMessages = [
       { role: "system", content: systemPrompt },
-      ...messages.map((m: any) => ({
-        role: m.role === 'ai' ? 'assistant' : 'user',
+      ...messages.slice(-10).map((m: any) => ({
+        role: m.role === 'ai' || m.role === 'assistant' ? 'assistant' : 'user',
         content: m.content
       })),
       { role: "user", content: query }
     ];
 
-    // 4. Chamar a OpenAI
     const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -129,14 +116,15 @@ ${contextText}
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: openaiMessages,
-        temperature: 0.5,
-        max_tokens: 1500,
+        temperature: 0.7,
+        max_tokens: 2000,
       })
     })
 
     if (!aiResponse.ok) {
-        console.error('API err:', await aiResponse.text())
-        throw new Error(`Erro na OpenAI Chat API.`)
+        const errText = await aiResponse.text()
+        console.error('OpenAI Error:', errText)
+        throw new Error('Erro na comunicação com o cérebro da IA.')
     }
 
     const aiData = await aiResponse.json()

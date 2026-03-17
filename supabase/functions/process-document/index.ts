@@ -113,14 +113,15 @@ serve(async (req: Request) => {
       }
     }
 
+    // Batch processing
     await supabase.from('document_chunks').delete().eq('document_id', documentId)
 
+    const BATCH_SIZE = 10
     let successCount = 0
-    let lastErrorDetails = ''
 
-    for (const chunk of chunks) {
-      const cleanChunk = chunk.trim()
-      if (cleanChunk.length < 10) continue
+    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+      const batchChunks = chunks.slice(i, i + BATCH_SIZE).map(c => c.trim()).filter(c => c.length > 5)
+      if (batchChunks.length === 0) continue
 
       try {
         const embedResponse = await fetch('https://api.openai.com/v1/embeddings', {
@@ -130,43 +131,48 @@ serve(async (req: Request) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            input: cleanChunk,
+            input: batchChunks,
             model: 'text-embedding-3-small'
           })
         })
 
         if (!embedResponse.ok) {
           const apiErr = await embedResponse.text()
-          lastErrorDetails = `OpenAI recusou (Http ${embedResponse.status}): ${apiErr.substring(0, 100)}`
+          console.error(`OpenAI error (Batch ${i}):`, apiErr)
           continue
         }
 
         const embedResult = await embedResponse.json()
-        const embedding = embedResult?.data?.[0]?.embedding
-        
-        if (!embedding) continue
+        const embeddings = embedResult?.data?.map((d: any) => d.embedding)
 
-        const { error: insertError } = await supabase.from('document_chunks').insert({
-          document_id: documentId,
-          content: cleanChunk,
-          embedding: embedding,
-          metadata: { name: document.name, type: fileExt, subject_id: document.subject_id }
-        })
+        if (embeddings && embeddings.length === batchChunks.length) {
+          const insertData = batchChunks.map((chunk, idx) => ({
+            document_id: documentId,
+            content: chunk,
+            embedding: embeddings[idx],
+            metadata: { 
+              name: document.name, 
+              type: fileExt, 
+              subject_id: document.subject_id,
+              processed_at: new Date().toISOString()
+            }
+          }))
 
-        if (insertError) {
-          lastErrorDetails = `Erro DB: ${insertError.message}`
-        } else {
-          successCount++
+          const { error: insertError } = await supabase.from('document_chunks').insert(insertData)
+
+          if (insertError) {
+            console.error(`DB Insert Error (Batch ${i}):`, insertError.message)
+          } else {
+            successCount += batchChunks.length
+          }
         }
-      } catch (chunkErr: any) {
-         lastErrorDetails = `Loop Err: ${chunkErr?.message || '?'}`
+      } catch (err: any) {
+        console.error(`Batch ${i} fatal error:`, err?.message)
       }
-      
-      await new Promise(r => setTimeout(r, 60)) // Tiny rate-limit delay
     }
 
-    if (successCount === 0) {
-      throw new Error(`0% retido. ${chunks.length} fragmentos negados. Erro: ${lastErrorDetails}`)
+    if (successCount === 0 && chunks.length > 0) {
+      throw new Error(`Falha ao processar embeddings. Verifique as chaves de API e limites.`)
     }
 
     await supabase.from('documents').update({ status: 'ready' }).eq('id', documentId)
