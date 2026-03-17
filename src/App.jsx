@@ -173,6 +173,7 @@ function App() {
     const [newAuthEmail, setNewAuthEmail] = useState('')
     const [isManagingProfs, setIsManagingProfs] = useState(false)
     const [isManagingUsers, setIsManagingUsers] = useState(false)
+    const [showAdminDashboard, setShowAdminDashboard] = useState(false)
     const [usersList, setUsersList] = useState([])
     const [showDevPopup, setShowDevPopup] = useState(false)
     const [isNavVisible, setIsNavVisible] = useState(true)

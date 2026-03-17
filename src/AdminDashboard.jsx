@@ -14,7 +14,8 @@ import {
     Calendar,
     BadgeAlert,
     ChevronDown,
-    Loader2
+    Loader2,
+    History
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
