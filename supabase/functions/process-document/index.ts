@@ -24,39 +24,14 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const openAiKey = Deno.env.get('OPENAI_API_KEY') || Deno.env.get('openai-api-key') || Deno.env.get('Openai_api_key') || Deno.env.get('openai_api_key')
-    if (!openAiKey) throw new Error('A chave da OpenAI (OPENAI_API_KEY) não está configurada nas variáveis de ambiente')
-    const authHeader = req.headers.get('Authorization')
-    let userId = null
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '')
-      try {
-        const { data: userData } = await supabase.auth.getUser(token)
-        if (userData?.user) userId = userData.user.id
-      } catch (err) {
-        console.error('Falha ao verificar token:', err.message)
-      }
-    }
+    const googleKey = Deno.env.get('GOOGLE_API_KEY') || Deno.env.get('google_api_key') || Deno.env.get('Google_api_key')
+    if (!googleKey) throw new Error('A chave do Google (Gemini) não está configurada nas secrets do Supabase')
 
-    // Função auxiliar para tentar buscar o documento com retry (evita race condition)
-    const getDocumentWithRetry = async (id: string, retries = 3) => {
-      for (let i = 0; i < retries; i++) {
-        const { data, error } = await supabase
-          .from('documents')
-          .select('*')
-          .eq('id', id)
-          .single()
-        
-        if (data) return { data, error: null }
-        if (i < retries - 1) {
-          console.log(`Tentativa ${i + 1} falhou, aguardando 1s...`)
-          await new Promise(resolve => setTimeout(resolve, 1000))
-        }
-      }
-      return { data: null, error: new Error('Documento não encontrado após várias tentativas') }
-    }
-
-    const { data: document, error: docError } = await getDocumentWithRetry(documentId)
+    const { data: document, error: docError } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('id', documentId)
+      .single()
 
     if (docError || !document) throw new Error(docError?.message || 'Documento não encontrado no banco de dados')
 
@@ -74,17 +49,6 @@ serve(async (req: Request) => {
 
     if (fileExt === 'txt' || fileExt === 'csv' || fileExt === 'md' || fileExt === 'json') {
       textContent = new TextDecoder().decode(arrayBuffer)
-    } else if (fileExt === 'rtf') {
-      const rawText = new TextDecoder().decode(arrayBuffer)
-      textContent = rawText
-            .replace(/\{\\*?\\[^{}]+}/gi, '')
-            .replace(/\{\\[a-z]+\d?[ ]/gi, '')
-            .replace(/\\[a-z]+\d* ?/gi, ' ')
-            .replace(/\\'([0-9a-fA-F]{2})/gi, '')
-            .replace(/\\[^a-z]/gi, '')
-            .replace(/[{}]/g, '')
-            .replace(/\s+/g, ' ')
-            .trim()
     } else if (fileExt === 'pdf') {
       try {
         const pdfData = await pdf(buffer)
@@ -97,20 +61,13 @@ serve(async (req: Request) => {
     }
 
     if (!textContent || textContent.trim().length < 15) {
-      throw new Error(`Texto extraído está vazio ou ilegível (Tamanho: ${textContent?.length || 0})`)
+      throw new Error(`Texto extraído está vazio ou ilegível.`)
     }
 
-    console.log(`Extração OK: ${textContent.length} caracteres para formato .${fileExt}`)
+    console.log(`Processando documento com Gemini 1.5: ${textContent.length} caracteres`)
 
-    // Limpeza Mínima Rápida (substitui a limpeza pesada anterior que causava CPU Timeout de 9s no Deno)
-    // Remove apenas bytes Nulos e quebras invisiveis
-    let safeText = textContent.replace(/\0/g, '')
-    // Somente para RTF que pode ter lixo bizarro rodamos um sanitizador manual por linha pra evitar Crash Regex
-    if (fileExt === 'rtf') {
-        safeText = safeText.replace(/[^\x20-\x7E\xA0-\xFF\n]/g, ' ')
-    }
-
-    const paragraphs = safeText.split(/\n\n+/).filter(p => p.trim().length > 20)
+    // Chunks
+    const paragraphs = textContent.replace(/\0/g, '').split(/\n\n+/).filter(p => p.trim().length > 20)
     const chunks: string[] = []
 
     for (const para of paragraphs) {
@@ -132,72 +89,57 @@ serve(async (req: Request) => {
     }
 
     if (chunks.length === 0) {
-      const raw = safeText.trim()
+      const raw = textContent.trim()
       for (let i = 0; i < raw.length; i += 800) {
         chunks.push(raw.slice(i, i + 800))
       }
     }
 
-    // Batch processing
+    // Limpar chunks antigos
     await supabase.from('document_chunks').delete().eq('document_id', documentId)
 
-    const BATCH_SIZE = 10
+    const BATCH_SIZE = 1 // Gemini batch embeddings is slightly different, let's process one by one or use batchContent
     let successCount = 0
 
-    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
-      const batchChunks = chunks.slice(i, i + BATCH_SIZE).map(c => c.trim()).filter(c => c.length > 5)
-      if (batchChunks.length === 0) continue
-
+    // Google Gemini gemini-embedding-001 (reduzido para 768 para compatibilidade PGVector)
+    for (const chunkText of chunks) {
       try {
-        const embedResponse = await fetch('https://api.openai.com/v1/embeddings', {
+        const embedResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${googleKey}`, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openAiKey}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            input: batchChunks,
-            model: 'text-embedding-3-small'
+             content: { parts: [{ text: chunkText }] },
+             outputDimensionality: 768
           })
         })
 
-        if (!embedResponse.ok) {
-          const apiErr = await embedResponse.text()
-          console.error(`OpenAI error (Batch ${i}):`, apiErr)
-          continue
-        }
+        if (!embedResponse.ok) continue
 
         const embedResult = await embedResponse.json()
-        const embeddings = embedResult?.data?.map((d: any) => d.embedding)
+        const embedding = embedResult?.embedding?.values
 
-        if (embeddings && embeddings.length === batchChunks.length) {
-          const insertData = batchChunks.map((chunk, idx) => ({
+        if (embedding && embedding.length === 768) {
+          const { error: insertError } = await supabase.from('document_chunks').insert({
             document_id: documentId,
-            content: chunk,
-            embedding: embeddings[idx],
+            content: chunkText,
+            embedding: embedding,
             metadata: { 
               name: document.name, 
               type: fileExt, 
               subject_id: document.subject_id,
               processed_at: new Date().toISOString()
             }
-          }))
+          })
 
-          const { error: insertError } = await supabase.from('document_chunks').insert(insertData)
-
-          if (insertError) {
-            console.error(`DB Insert Error (Batch ${i}):`, insertError.message)
-          } else {
-            successCount += batchChunks.length
-          }
+          if (!insertError) successCount++
         }
       } catch (err: any) {
-        console.error(`Batch ${i} fatal error:`, err?.message)
+        console.error(`Chunk error:`, err?.message)
       }
     }
 
     if (successCount === 0 && chunks.length > 0) {
-      throw new Error(`Falha ao processar embeddings. Verifique as chaves de API e limites.`)
+      throw new Error(`Falha ao processar embeddings com Gemini.`)
     }
 
     await supabase.from('documents').update({ status: 'ready' }).eq('id', documentId)
@@ -206,7 +148,7 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error: any) {
-    console.error('Edge Function Fatal Crash:', error?.message)
+    console.error('Edge Function Fatal Crash (Gemini Process):', error?.message)
     return new Response(JSON.stringify({ error: error?.message || 'Erro Server-Side' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

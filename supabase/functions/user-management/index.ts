@@ -17,12 +17,18 @@ serve(async (req: Request) => {
     const authHeader = req.headers.get("Authorization")!
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
     const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE)
+    // Configura cliente para validar o auth JWT do usuário
+    const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } }
+    })
+    
+    // Configura cliente admin para ler/deletar da auth.users
+    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE)
 
     // Identify requester
-    const token = authHeader.replace("Bearer ", "")
-    const { data: { user: requester }, error: authError } = await supabase.auth.getUser(token)
+    const { data: { user: requester }, error: authError } = await supabaseAuth.auth.getUser()
 
     if (authError || !requester) {
       return new Response(JSON.stringify({ error: "Invalid user session" }), {
@@ -45,11 +51,11 @@ serve(async (req: Request) => {
       }
 
       // Fetch all users from auth.users (requires service_role)
-      const { data: { users }, error: listError } = await supabase.auth.admin.listUsers()
+      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers()
       if (listError) throw listError
 
       // Fetch all profiles from public.profiles
-      const { data: profiles, error: profileError } = await supabase
+      const { data: profiles, error: profileError } = await supabaseAdmin
         .from("profiles")
         .select("*")
       
@@ -87,7 +93,7 @@ serve(async (req: Request) => {
 
       console.log(`[user-management] Deleting user ${targetUserId} requested by ${requester.email}`)
 
-      const { error: deleteError } = await supabase.auth.admin.deleteUser(targetUserId)
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId)
       if (deleteError) throw deleteError
 
       return new Response(JSON.stringify({ success: true }), {

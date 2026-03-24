@@ -25,7 +25,9 @@ import {
     Info,
     ShieldCheck,
     ArrowLeft,
-    GraduationCap
+    GraduationCap,
+    Menu,
+    MoreVertical
 } from 'lucide-react'
 
 export default function ProfessorPortal({ session, onLogout, isAdmin, setViewingProfessorPortal }) {
@@ -227,7 +229,7 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
 
         try {
             setIsGeneratingExam(true)
-            const { error } = await supabase.functions.invoke('generate-quiz', {
+            const { data, error } = await supabase.functions.invoke('generate-quiz', {
                 body: { subjectId: subject.id, limit: 10 }
             })
 
@@ -238,7 +240,31 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                 [limitKey]: currentCount + 1
             }))
             
-            alert(`Prova gerada com sucesso para ${subject.name}!`)
+            const quizList = data?.questions || []
+            if (quizList.length === 0) {
+                alert(`Nenhuma questão gerada.`)
+                return
+            }
+            
+            let visibleText = `📚 **QUIZ: ${subject.name}**\n\nResponda as questões abaixo e eu irei corrigi-las para você e explicar os erros!\n\n`
+            let internalAnswers = `\n\n[GABARITO OCULTO - IA, USE ISTO PARA CORRIGIR AS RESPOSTAS DO USUÁRIO PARA ESTE QUIZ]:\n`
+            
+            quizList.forEach((q, i) => {
+                visibleText += `**${i+1}. ${q.question}**\n`
+                if (q.options) {
+                    q.options.forEach((opt, j) => {
+                        visibleText += `${['A','B','C','D'][j]}) ${opt}\n`
+                    })
+                }
+                visibleText += '\n'
+                internalAnswers += `Questão ${i+1} Correta: ${q.answer}. Explicação Base: ${q.explanation}\n`
+            })
+            
+            setMessages(prev => [...prev, { 
+                role: 'assistant', 
+                content: visibleText.trim(),
+                internalContext: internalAnswers
+            }])
         } catch (err) {
             alert('Erro ao gerar prova: ' + err.message)
         } finally {
@@ -434,29 +460,27 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
         }
     }
 
-    const handleAskIA = async () => {
-        if (!query.trim() || !selectedSubject) return
+    const handleAskIA = async (overrideQuery = null) => {
+        const textToAsk = typeof overrideQuery === 'string' ? overrideQuery : query
+        if (!textToAsk.trim() || !selectedSubject) return
         
-        const userMsg = { role: 'user', content: query }
+        const userMsg = { role: 'user', content: textToAsk }
         setMessages(prev => [...prev, userMsg])
-        setQuery('')
+        if (!overrideQuery || typeof overrideQuery !== 'string') setQuery('')
         setLoading(true)
 
         try {
-            // Prompt refinado para melhor legibilidade e estruturação
-            const structuralPrompt = `Responda de forma clara e organizada:
-- Use listas para múltiplos itens
-- Use negrito para termos chave
-- Deixe espaços entre parágrafos
-- Se a informação estiver nos PDFs, cite-a. Se não, avise.
-
-Pergunta: ${query}`;
+            const chatHistory = messages.map(msg => ({
+                role: msg.role === 'assistant' ? 'model' : 'user',
+                text: msg.content + (msg.internalContext || '')
+            }))
 
             const { data, error } = await supabase.functions.invoke('ask-ai', {
                 body: { 
-                    query: structuralPrompt, 
+                    query: textToAsk, 
                     subjectId: selectedSubject.id,
-                    mode: 'curation' 
+                    mode: 'curation',
+                    chatHistory: chatHistory
                 }
             })
 
@@ -700,9 +724,27 @@ Pergunta: ${query}`;
                 </div>
             </header>
             
-            <main className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 mt-8">
-                {/* Coluna Esquerda: Documentos e Notas */}
-                <div className="lg:col-span-4 flex flex-col gap-6">
+            <main className="flex-1 mt-8 flex flex-col gap-8 w-full max-w-7xl mx-auto">
+                {/* DASHBOARD DOCENTE (Estilo Lovable / Repositório Novo) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full animate-fade-in">
+                    <button 
+                        onClick={() => setShowExamForm(true)} 
+                        className="bg-estuda-surface border-none shadow-xl shadow-black/20 hover:scale-[1.02] text-left p-6 rounded-[2rem] transition-all flex flex-col items-center justify-center text-center gap-3 relative overflow-hidden group"
+                    >
+                        <div className="absolute inset-0 bg-estuda-primary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <div className="bg-estuda-primary/10 p-4 rounded-2xl text-estuda-primary group-hover:scale-110 transition-transform relative z-10">
+                            <FileQuestion size={32} />
+                        </div>
+                        <div className="relative z-10">
+                            <h3 className="font-bold text-sm text-white">Agendar Provas</h3>
+                            <p className="text-[10px] text-white/40 uppercase font-black tracking-widest mt-1">Reflete para alunos</p>
+                        </div>
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 w-full">
+                    {/* Coluna Esquerda: Documentos e Notas */}
+                    <div className="lg:col-span-4 flex flex-col gap-6">
                     {/* Lista de Matérias Selecionável (Estilo Compacto) */}
                     <div className="bg-estuda-surface border border-estuda-primary/10 rounded-[2.5rem] p-6 shadow-lg">
                         <select 
@@ -831,15 +873,29 @@ Pergunta: ${query}`;
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 relative group">
                             <button 
-                                onClick={() => handleGenerateExam(selectedSubject)}
                                 disabled={isGeneratingExam || !selectedSubject}
-                                className="bg-estuda-primary text-white px-4 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-wider hover:scale-105 active:scale-95 transition-all shadow-lg shadow-estuda-primary/20 flex items-center gap-2 disabled:opacity-50"
+                                className="bg-estuda-primary text-white p-2.5 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-estuda-primary/20 flex items-center justify-center disabled:opacity-50"
                             >
-                                {isGeneratingExam ? <Loader2 size={12} className="animate-spin" /> : <Layers size={12} />}
-                                CRIAR QUIZ (10)
+                                {isGeneratingExam ? <Loader2 size={16} className="animate-spin" /> : <Menu size={16} />}
                             </button>
+                            <div className="absolute right-0 top-full mt-2 w-48 bg-estuda-surface border border-white/10 rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden flex flex-col">
+                                <button 
+                                    onClick={() => handleGenerateExam(selectedSubject)}
+                                    className="w-full text-left px-4 py-3 text-xs font-bold text-white hover:bg-white/5 transition-colors flex items-center gap-2"
+                                >
+                                    <FileQuestion size={14} className="text-estuda-primary" />
+                                    Gerar Quiz (10)
+                                </button>
+                                <button 
+                                    onClick={() => handleAskIA("Gere um resumo detalhado dos meus materiais e anotações para facilitar a revisão dos alunos. Divida em tópicos principais.")}
+                                    className="w-full text-left px-4 py-3 text-xs font-bold text-white hover:bg-white/5 transition-colors flex items-center gap-2 border-t border-white/5"
+                                >
+                                    <FileText size={14} className="text-blue-400" />
+                                    Gerar Resumo
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -909,6 +965,7 @@ Pergunta: ${query}`;
                         </div>
                     </div>
                 </div>
+                </div> {/* Fechamento do grid w-full */}
             </main>
 
             {/* Modal de Agendamento de Prova */}

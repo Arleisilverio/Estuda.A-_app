@@ -1,7 +1,9 @@
 const dotenv = require('dotenv');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
-dotenv.config();
+const path = require('path');
+
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 /**
  * Realiza chamada ao Gemini 1.5 Flash com fallback automático.

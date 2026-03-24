@@ -31,7 +31,9 @@ import {
     Quote,
     Users,
     Mail,
-    Fingerprint
+    Fingerprint,
+    CheckCircle,
+    Check
 } from 'lucide-react'
 
 // Imagens para o carrossel
@@ -134,6 +136,7 @@ function App() {
     const [showDocSelect, setShowDocSelect] = useState(false)
     const [selectedDocId, setSelectedDocId] = useState('')
     const [pendingAction, setPendingAction] = useState(null) // 'quiz', 'summary', 'guide', 'citations'
+    const [activeDocFilter, setActiveDocFilter] = useState('') // '' = todos os materiais
 
     // Estado do Carrossel (dados do banco)
     const [currentSlide, setCurrentSlide] = useState(0)
@@ -200,27 +203,20 @@ function App() {
         return () => window.removeEventListener('scroll', handleScroll)
     }, [lastScrollY])
 
-    // Verificar suporte a biometria
-    useEffect(() => {
+    // Verificar suporte a biometria (Desativado conforme pedido)
+    /* useEffect(() => {
         const checkBiometry = async () => {
             const supported = await isBiometryAvailable()
             setBiometrySupported(supported)
-            
-            // Se logado, verificar se já tem biometria configurada
             if (session?.user?.id && supported) {
-                const { data } = await supabase
-                    .from('user_credentials')
-                    .select('id')
-                    .eq('user_id', session.user.id)
-                    .limit(1)
-                
-                if (!data || data.length === 0) {
-                    setShowBiometryInvite(true)
-                }
+                const dismissed = localStorage.getItem(`biometry_dismissed_${session.user.id}`)
+                if (dismissed) return
+                const { data } = await supabase.from('user_credentials').select('id').eq('user_id', session.user.id).limit(1)
+                if (!data || data.length === 0) setShowBiometryInvite(true)
             }
         }
         checkBiometry()
-    }, [session])
+    }, [session]) */
 
     const handleRegisterBiometry = async () => {
         if (!session?.user?.id) return
@@ -871,7 +867,7 @@ Pergunta do Aluno: ${query}`;
                 }
             })
             if (error) throw error
-            const aiMessage = { role: 'assistant', content: data.answer }
+            const aiMessage = { role: 'assistant', content: data.answer, sources: data.sources || [] }
             setMessages(prev => [...prev, aiMessage])
         } catch (error) {
             console.error('Erro ao perguntar:', error)
@@ -887,6 +883,7 @@ Pergunta do Aluno: ${query}`;
         setResponse(null)
         setMessages([])
         setQuery('')
+        setActiveDocFilter('') // Resetar filtro ao trocar de matéria
         fetchDocuments(subject.id)
     }
 
@@ -956,11 +953,8 @@ Pergunta do Aluno: ${query}`;
     const handleActionClick = (action) => {
         setPendingAction(action)
         setSelectedDocId('')
-        if (files.length > 1) {
-            setShowDocSelect(true)
-        } else {
-            executePendingAction(action, files.length === 1 ? files[0].id : '')
-        }
+        // Sempre abre o modal — o usuário escolhe o material ou "Todos"
+        setShowDocSelect(true)
     }
 
     const executePendingAction = (action, docId) => {
@@ -1086,7 +1080,10 @@ Pergunta do Aluno: ${query}`;
             percentage: Math.round((correctCount / quizQuestions.length) * 100)
         }
         setQuizResult(result)
-        saveQuizResult(result)
+        // Só salva histórico para alunos — professores dispensam
+        if (userRole === 'student') {
+            saveQuizResult(result)
+        }
     }
 
     const saveQuizResult = async (result) => {
@@ -2489,55 +2486,84 @@ Pergunta do Aluno: ${query}`;
             {showDocSelect && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowDocSelect(false)}></div>
-                    <div className="bg-estuda-surface border border-estuda-primary/20 p-6 sm:p-8 rounded-[2.5rem] shadow-2xl w-full max-w-sm relative z-10 animate-fade-in flex flex-col overflow-y-auto" style={{ maxHeight: '90vh' }}>
-                        <h3 className="text-xl sm:text-2xl font-black mb-6 text-white flex items-center gap-2">
-                            <Layers size={24} className="text-estuda-primary" /> Selecione o Material
+                    <div className="bg-estuda-surface border border-estuda-primary/20 p-6 sm:p-8 rounded-[2.5rem] shadow-2xl w-full max-w-sm relative z-10 animate-fade-in flex flex-col overflow-y-auto" style={{ maxHeight: '95vh' }}>
+                        <h3 className="text-xl sm:text-2xl font-black mb-2 text-white flex items-center gap-2">
+                            <Layers size={21} className="text-estuda-primary" /> Selecione o Material
                         </h3>
-                        
-                        <p className="text-xs font-bold text-white/60 mb-6 px-2">Escolha qual material deve ser a base principal para esta ação ou use todos os documentos do professor.</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-5 px-1 font-bold">Base de Conhecimento para a IA</p>
 
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-3 mb-6">
+                            {/* Opção: Todos */}
                             <button
-                                onClick={() => executePendingAction(pendingAction, '')}
-                                className="w-full flex items-center gap-4 p-4 rounded-2xl bg-estuda-primary/10 border border-estuda-primary/20 hover:bg-estuda-primary/20 transition-all text-left group"
+                                onClick={() => setSelectedDocId('')}
+                                className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all text-left ${
+                                    selectedDocId === ''
+                                        ? 'bg-estuda-primary border-estuda-primary shadow-xl shadow-estuda-primary/20 scale-[1.02]'
+                                        : 'bg-white/5 border-white/5 hover:bg-white/10'
+                                }`}
                             >
-                                <div className="size-10 rounded-xl bg-estuda-primary/20 flex items-center justify-center text-estuda-primary group-hover:scale-110 transition-transform">
-                                    <Sparkles size={20} />
+                                <div className={`size-10 rounded-xl flex items-center justify-center transition-all ${
+                                    selectedDocId === '' ? 'bg-white/20 text-white' : 'bg-estuda-primary/20 text-estuda-primary'
+                                }`}>
+                                    {selectedDocId === '' ? <Check size={20} /> : <Sparkles size={20} />}
                                 </div>
-                                <div>
-                                    <p className="font-black text-sm text-white">Todos os Materiais</p>
-                                    <p className="text-[10px] uppercase font-bold text-estuda-primary opacity-60">Visão Geral Completa</p>
+                                <div className="flex-1">
+                                    <p className={`font-black text-sm ${selectedDocId === '' ? 'text-white' : 'text-white/80'}`}>Todos os Materiais</p>
+                                    <p className={`text-[10px] uppercase font-bold ${selectedDocId === '' ? 'text-white/60' : 'text-white/30'}`}>Visão Geral Completa</p>
                                 </div>
                             </button>
 
-                            <div className="h-px bg-white/5 my-2"></div>
+                            <div className="relative py-2">
+                                <span className="absolute left-0 top-1/2 -translate-y-1/2 text-[9px] font-black uppercase text-white/20 bg-estuda-surface pr-3 z-10 tracking-[0.2em]">Materiais Processados</span>
+                                <div className="w-full h-px bg-white/5"></div>
+                            </div>
 
                             {files.map(file => (
                                 <button
                                     key={file.id}
-                                    onClick={() => executePendingAction(pendingAction, file.id)}
-                                    className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-left group"
+                                    onClick={() => setSelectedDocId(file.id)}
+                                    className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all text-left ${
+                                        selectedDocId === file.id
+                                            ? 'bg-estuda-primary border-estuda-primary shadow-xl shadow-estuda-primary/20 scale-[1.02]'
+                                            : 'bg-white/5 border-white/5 hover:bg-white/10'
+                                    }`}
                                 >
-                                    <div className="size-10 rounded-xl bg-white/5 flex items-center justify-center text-white/40 group-hover:scale-110 transition-transform">
-                                        <FileText size={20} />
+                                    <div className={`size-10 rounded-xl flex items-center justify-center transition-all ${
+                                        selectedDocId === file.id ? 'bg-white/20 text-white' : 'bg-white/5 text-white/40'
+                                    }`}>
+                                        {selectedDocId === file.id ? <Check size={20} /> : <FileText size={20} />}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-bold text-sm text-white truncate">{file.name}</p>
+                                        <p className={`font-black text-sm truncate ${selectedDocId === file.id ? 'text-white' : 'text-white/80'}`}>{file.name}</p>
                                         <p className="text-[10px] uppercase font-bold text-white/30 truncate">Material Específico</p>
                                     </div>
                                 </button>
                             ))}
                         </div>
 
-                        <button
-                            onClick={() => setShowDocSelect(false)}
-                            className="w-full mt-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-white/40 hover:text-white transition-colors"
-                        >
-                            FECHAR
-                        </button>
+                        {/* Botão Confirmar — Agora centralizado e proeminente */}
+                        <div className="w-full flex flex-col gap-3">
+                            <button
+                                onClick={() => {
+                                    executePendingAction(pendingAction, selectedDocId)
+                                    setShowDocSelect(false)
+                                }}
+                                className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all bg-estuda-primary text-white hover:scale-[1.02] active:scale-95 shadow-xl shadow-estuda-primary/30`}
+                            >
+                                GERAR COM {selectedDocId ? 'MATERIAL SELECIONADO' : 'TODOS OS MATERIAIS'}
+                            </button>
+
+                            <button
+                                onClick={() => setShowDocSelect(false)}
+                                className="w-full py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest text-white/30 hover:text-white transition-colors"
+                            >
+                                CANCELAR
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
+
 
             {/* Modal Sobre o Criador (DevPopup) */}
             {showDevPopup && (
@@ -2582,35 +2608,16 @@ Pergunta do Aluno: ${query}`;
                 </div>
             )}
 
-            {/* Modal de Convite para Biometria */}
-            {showBiometryInvite && (
+            {/* Modal de Convite para Biometria (Completamente Desativado) */}
+            {false && showBiometryInvite && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 sm:p-10 pointer-events-auto">
                     <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowBiometryInvite(false)} />
                     <div className="bg-estuda-surface border border-estuda-primary/20 w-full max-w-sm rounded-[2.5rem] p-8 flex flex-col items-center text-center relative z-[201] animate-scale-up shadow-2xl">
-                        <div className="size-16 bg-estuda-primary/10 rounded-full flex items-center justify-center mb-6 border border-estuda-primary/20">
-                            <Fingerprint className="text-estuda-primary" size={32} />
-                        </div>
-                        <h3 className="text-xl font-black text-white mb-2">Acesso Rápido</h3>
-                        <p className="text-sm text-white/40 font-medium mb-8">
-                            Deseja ativar o acesso por biometria (digital ou rosto) para entrar mais rápido no Estuda Aí?
-                        </p>
-                        <div className="w-full flex flex-col gap-3">
-                            <button
-                                onClick={handleRegisterBiometry}
-                                className="w-full bg-estuda-primary text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-estuda-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
-                            >
-                                ATIVAR AGORA
-                            </button>
-                            <button
-                                onClick={() => setShowBiometryInvite(false)}
-                                className="w-full bg-white/5 text-white/40 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all"
-                            >
-                                AGORA NÃO
-                            </button>
-                        </div>
+                        {/* ... */}
                     </div>
                 </div>
             )}
+
 
             <style>{`
                 @keyframes scale-up {

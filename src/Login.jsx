@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { supabase } from './lib/supabase'
-import { Mail, Lock, Eye, EyeOff, Loader2, GraduationCap, Fingerprint } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, Loader2, GraduationCap } from 'lucide-react'
 
 const AppLogo = () => (
     <div className="size-20 relative flex items-center justify-center bg-white rounded-[30%] shadow-2xl shadow-blue-500/20 border-2 border-white/10 overflow-hidden mb-2">
@@ -12,13 +12,14 @@ const AppLogo = () => (
     </div>
 )
 
-export default function Login({ biometrySupported, onBiometricLogin }) {
-    const [mode, setMode] = useState('login') // 'login' | 'register'
+export default function Login() {
+    const [mode, setMode] = useState('login') // 'login' | 'register' | 'reset'
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+    const [successMessage, setSuccessMessage] = useState('')
     const [acceptedTerms, setAcceptedTerms] = useState(false)
     const [showTerms, setShowTerms] = useState(false)
     const [showPrivacy, setShowPrivacy] = useState(false)
@@ -26,6 +27,7 @@ export default function Login({ biometrySupported, onBiometricLogin }) {
     const handleSubmit = async (e) => {
         e.preventDefault()
         setError('')
+        setSuccessMessage('')
         
         if (mode === 'register' && !acceptedTerms) {
             setError('Você precisa aceitar os termos de uso para continuar.')
@@ -38,6 +40,15 @@ export default function Login({ biometrySupported, onBiometricLogin }) {
             if (mode === 'register') {
                 const { error } = await supabase.auth.signUp({ email, password })
                 if (error) throw error
+                setSuccessMessage("Conta criada com sucesso! Verifique seu email para confirmar ou já pode fazer o Login.")
+                setMode('login')
+            } else if (mode === 'reset') {
+                const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                    redirectTo: window.location.origin
+                })
+                if (error) throw error
+                setSuccessMessage("Se este e-mail for válido, um link de recuperação foi enviado. Verifique sua caixa de entrada.")
+                setMode('login')
             } else {
                 const { error } = await supabase.auth.signInWithPassword({ email, password })
                 if (error) throw error
@@ -57,7 +68,6 @@ export default function Login({ biometrySupported, onBiometricLogin }) {
 
     return (
         <div className="min-h-screen bg-estuda-bg text-estuda-text flex flex-col items-center justify-center p-6 relative overflow-hidden">
-            {/* Background decorativo */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute -top-40 -right-40 w-96 h-96 bg-estuda-primary/10 rounded-full blur-3xl" />
                 <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-600/5 rounded-full blur-3xl" />
@@ -68,15 +78,13 @@ export default function Login({ biometrySupported, onBiometricLogin }) {
                     <AppLogo />
                 </div>
 
-                {/* Card */}
                 <div className="bg-estuda-surface border border-estuda-primary/10 rounded-[2.5rem] p-8 shadow-2xl shadow-black/40">
-                    {/* Toggle Entrar / Criar Conta */}
                     <div className="flex bg-estuda-bg rounded-2xl p-1 mb-8">
                         {['login', 'register'].map(m => (
                             <button
                                 key={m}
-                                onClick={() => { setMode(m); setError('') }}
-                                className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all ${mode === m
+                                onClick={() => { setMode(m); setError(''); setSuccessMessage(''); }}
+                                className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all ${mode === m || (mode === 'reset' && m === 'login')
                                         ? 'bg-estuda-primary text-white shadow-lg'
                                         : 'text-estuda-secondary hover:text-white'
                                     }`}
@@ -86,8 +94,14 @@ export default function Login({ biometrySupported, onBiometricLogin }) {
                         ))}
                     </div>
 
+                    {mode === 'reset' && (
+                        <div className="mb-4 text-center">
+                            <h3 className="font-bold text-white text-sm">Recuperação de Senha</h3>
+                            <p className="text-[10px] text-white/50 uppercase tracking-widest mt-1">Lembrou da senha? <button onClick={() => setMode('login')} className="text-estuda-primary hover:underline">Voltar ao Login</button></p>
+                        </div>
+                    )}
+
                     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                        {/* E-mail */}
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">
                                 E-mail
@@ -108,35 +122,38 @@ export default function Login({ biometrySupported, onBiometricLogin }) {
                             </div>
                         </div>
 
-                        {/* Senha */}
-                        <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">
-                                Senha
-                            </label>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-estuda-primary transition-colors">
-                                    <Lock size={18} />
+                        {mode !== 'reset' && (
+                            <div>
+                                <label className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pr-1 pl-1">
+                                    <span>Senha</span>
+                                    {mode === 'login' && (
+                                        <button type="button" onClick={() => { setMode('reset'); setError(''); setSuccessMessage(''); }} className="text-estuda-primary hover:text-white transition-colors">Esqueci</button>
+                                    )}
+                                </label>
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-estuda-primary transition-colors">
+                                        <Lock size={18} />
+                                    </div>
+                                    <input
+                                        required
+                                        type={showPassword ? 'text' : 'password'}
+                                        placeholder={mode === 'register' ? 'Mínimo 6 caracteres' : '••••••••'}
+                                        value={password}
+                                        onChange={e => setPassword(e.target.value)}
+                                        autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                                        className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl pl-12 pr-12 py-3.5 text-sm font-bold focus:outline-none focus:border-estuda-primary/60 transition-colors placeholder:text-white/20 text-white"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                                    >
+                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
                                 </div>
-                                <input
-                                    required
-                                    type={showPassword ? 'text' : 'password'}
-                                    placeholder={mode === 'register' ? 'Mínimo 6 caracteres' : '••••••••'}
-                                    value={password}
-                                    onChange={e => setPassword(e.target.value)}
-                                    autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                                    className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl pl-12 pr-12 py-3.5 text-sm font-bold focus:outline-none focus:border-estuda-primary/60 transition-colors placeholder:text-white/20 text-white"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
-                                >
-                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                                </button>
                             </div>
-                        </div>
+                        )}
 
-                        {/* Termos de Uso - Apenas no Cadastro */}
                         {mode === 'register' && (
                             <div className="flex items-start gap-3 px-1 mt-1">
                                 <div className="pt-0.5">
@@ -157,49 +174,34 @@ export default function Login({ biometrySupported, onBiometricLogin }) {
                             </div>
                         )}
 
-                        {/* Erro */}
                         {error && (
-                            <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-xs font-bold text-red-400 animate-fade-in">
+                            <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-xs font-bold text-red-400 animate-fade-in text-center">
                                 {error}
                             </div>
                         )}
 
-                        {/* Botão */}
+                        {successMessage && (
+                            <div className="bg-green-500/10 border border-green-500/20 rounded-2xl px-4 py-3 text-xs font-bold text-green-400 animate-fade-in text-center">
+                                {successMessage}
+                            </div>
+                        )}
+
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-4 rounded-2xl font-black text-sm bg-estuda-primary text-white hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-estuda-primary/30 flex items-center justify-center gap-2 mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                            className="w-full py-4 rounded-2xl font-black text-sm bg-estuda-primary text-white hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-estuda-primary/30 flex items-center justify-center gap-2 mt-2 disabled:opacity-60 disabled:cursor-not-allowed uppercase"
                         >
                             {loading
                                 ? <><Loader2 className="animate-spin" size={18} /> Aguarde...</>
-                                : mode === 'login' ? 'ENTRAR' : 'CRIAR MINHA CONTA'
+                                : mode === 'login' ? 'ENTRAR' : mode === 'reset' ? 'ENVIAR LINK' : 'CRIAR MINHA CONTA'
                             }
                         </button>
                     </form>
 
-                    {mode === 'login' && biometrySupported && (
-                        <div className="mt-4 flex flex-col items-center gap-3">
-                            <div className="w-full flex items-center gap-3 opacity-20">
-                                <div className="h-px flex-1 bg-white" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">ou</span>
-                                <div className="h-px flex-1 bg-white" />
-                            </div>
-                            
-                            <button
-                                type="button"
-                                onClick={onBiometricLogin}
-                                className="w-full py-4 rounded-2xl font-black text-sm bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all flex items-center justify-center gap-3"
-                            >
-                                <Fingerprint size={20} className="text-estuda-primary" />
-                                ACESSO BIOMÉTRICO
-                            </button>
-                        </div>
-                    )}
-
                     {mode === 'login' && (
                         <p className="text-center text-xs opacity-30 font-semibold mt-6">
                             Não tem conta?{' '}
-                            <button onClick={() => { setMode('register'); setError('') }} className="text-estuda-primary font-black opacity-100 hover:underline">
+                            <button onClick={() => { setMode('register'); setError(''); setSuccessMessage(''); }} className="text-estuda-primary font-black opacity-100 hover:underline">
                                 Cadastre-se grátis
                             </button>
                         </p>
@@ -211,7 +213,6 @@ export default function Login({ biometrySupported, onBiometricLogin }) {
                 </p>
             </div>
 
-            {/* Modal Termos de Uso (Placeholder) */}
             {(showTerms || showPrivacy) && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-10 pointer-events-auto">
                     <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => { setShowTerms(false); setShowPrivacy(false) }} />

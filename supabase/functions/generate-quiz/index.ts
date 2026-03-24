@@ -12,56 +12,37 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { subjectId, subjectName, documentId } = await req.json()
+    const { subjectId: rawSubjectId, subjectName, documentId } = await req.json()
+    const subjectId = rawSubjectId?.toString() // metadados salvos como string no JSON
 
-    // Validação básica
     if (!subjectId) throw new Error('O ID da matéria (subjectId) é obrigatório')
 
-    const openAiKey = Deno.env.get('OPENAI_API_KEY') || Deno.env.get('openai-api-key') || Deno.env.get('Openai_api_key') || Deno.env.get('openai_api_key')
-    if (!openAiKey) throw new Error('A chave da OpenAI não foi encontrada nas secrets do Supabase')
+    const googleKey = Deno.env.get('GOOGLE_API_KEY') || Deno.env.get('google_api_key') || Deno.env.get('Google_api_key')
+    if (!googleKey) throw new Error('A chave do Google (Gemini) não foi encontrada nas secrets do Supabase')
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
-    const authHeader = req.headers.get('Authorization')
-    let userId = null
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '')
-      try {
-        const { data: userData } = await supabase.auth.getUser(token)
-        if (userData?.user) userId = userData.user.id
-      } catch (err) {
-        console.error('Falha ao verificar token:', err.message)
-      }
-    }
 
-    console.log(`Gerando quiz para a matéria: ${subjectId} / Filtro Documento: ${documentId || 'Todos'}`)
+    console.log(`Gerando quiz Gemini para a matéria: ${subjectId} / Filtro Documento: ${documentId || 'Todos'}`)
 
     // 1. Buscar conteúdo de estudo (chunks)
-    let query = supabase
+    let queryBuilder = supabase
        .from('document_chunks')
        .select('content, document_id, metadata')
        
-    // Se enviou o ID de 1 PDF para focar a prova apenas nele:
     if (documentId) {
-       query = query.eq('document_id', documentId)
+       queryBuilder = queryBuilder.eq('document_id', documentId)
     } else {
-       // Filtro direto no banco por subject_id no JSONB metadata
-       query = query.filter('metadata->>subject_id', 'eq', subjectId)
+       queryBuilder = queryBuilder.filter('metadata->>subject_id', 'eq', subjectId)
     }
 
-    const { data: documents, error: docError } = await query.limit(50)
-
-    if (docError) {
-      console.error('Erro ao buscar chunks:', docError)
-    }
+    const { data: documents, error: docError } = await queryBuilder.limit(50)
 
     const filteredDocs = documents || []
-
-    // Embaralhar e pegar alguns aleatórios para n gerar sempre o msmo quiz
     const shuffled = [...filteredDocs].sort(() => 0.5 - Math.random())
-    const selectedDocs = shuffled.slice(0, 15) // limite de chunks no prompt
+    const selectedDocs = shuffled.slice(0, 15) 
     
     let contextText = selectedDocs.map((doc: any) => doc.content).join('\n\n')
     let basedOnMaterials = true
@@ -72,78 +53,73 @@ serve(async (req: Request) => {
       basedOnMaterials = false
     }
 
-    // 3. Formatar o prompt para o OpenAI pedindo JSON estruturado
-    const promptStr = `Você é um Criador de Quizzes educacionais focado em provas acadêmicas.
+    // 3. Formatar o prompt para o Gemini pedindo JSON estruturado
+    const sourceInfo = documentId ? "um MATERIAL ESPECÍFICO do professor" : "TODOS os materiais disponíveis da disciplina";
+    
+    const promptStr = `Você é um Criador de Quizzes educacionais premium para o app Estuda.AÍ.
 A matéria alvo desta avaliação é: ${subjectName || 'Assunto Principal'}.
+VOCÊ ESTÁ USANDO COMO BASE: ${sourceInfo}.
 
-Sua tarefa OBRIGATÓRIA é criar EXATAMENTE 10 QUESTÕES de múltipla escolha baseadas EXCLUSIVAMENTE nos Materiais de Estudo fornecidos abaixo (se houverem).
+Sua tarefa OBRIGATÓRIA é criar EXATAMENTE 10 QUESTÕES de múltipla escolha baseadas EXCLUSIVAMENTE nos Materiais de Estudo fornecidos abaixo. 
+Se o material for insuficiente, use seu conhecimento acadêmico apenas para complementar a didática, mantendo a fidelidade ao conteúdo original.
 
-REGRAS ESTANQUES:
-1. Sempre 10 questões, nunca menos, nunca mais.
-2. Todas as questões e os textos devem estar em Português do Brasil.
-3. Cada questão deve ter 4 alternativas claras ("options") que façam sentido, não faça óbvias demais.
-4. Apenas UMA alternativa deve estar correta.
-5. Você FOI OBRIGADO a incluir o campo "explanation" em TODA QUESTÃO. Este campo servirá como a explicação do gabarito (o porquê a resposta "answer" é a correta) para quando o aluno errar ele aprender, seja detalhista na explicação.
+REGRAS:
+1. Sempre 10 questões.
+2. Idioma: Português do Brasil.
+3. Cada questão deve ter 4 alternativas ("options").
+4. Apenas UMA alternativa correta ("answer").
+5. Inclua o campo "explanation" com a justificativa técnica/didática da resposta.
 
 O formato final DEVE obrigatoriamente ser um JSON válido contendo a raiz "questions":
 {
   "questions": [
     {
-      "question": "Texto da sua pergunta inteligente?",
+      "question": "Texto da sua pergunta?",
       "options": ["Opção A", "Opção B", "Opção C", "Opção D"],
       "answer": "Opção B",
-      "explanation": "A Opção B é correta porque no contexto o autor defende que..."
+      "explanation": "Explicação detalhada baseada no material..."
     }
   ]
 }
 
-MATERIAIS DE ESTUDO ENCONTRADOS NO PDF DO ALUNO (Use-os pesadamente):
+MATERIAIS DE APOIO (CONHECIMENTO RAG):
 """
 ${contextText}
 """`
 
-    // 4. Chamar a OpenAI (Usamos o O1 ou o gpt-4o para provas mais robustas?)
-    // O gpt-4o-mini já manda muito bem nisto e responde mais rapido pro frontend
-    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleKey}`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "system", content: promptStr }],
-        temperature: 0.6, // leve flexibilidade
-        response_format: { type: "json_object" }
+        contents: [{ parts: [{ text: promptStr }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.6,
+        }
       })
     })
 
     if (!aiResponse.ok) {
-        throw new Error(`Erro na OpenAI API: ${await aiResponse.text()}`)
+        throw new Error(`Erro na API Gemini: ${await aiResponse.text()}`)
     }
 
     const aiData = await aiResponse.json()
-    const jsonString = aiData.choices?.[0]?.message?.content || '{"questions":[]}'
+    const jsonString = aiData.candidates?.[0]?.content?.parts?.[0]?.text || '{"questions":[]}'
     
     let parsedData
     try {
         parsedData = JSON.parse(jsonString)
     } catch(e) {
-        throw new Error("Erro de formatação na resposta (JSON parse failed).")
+        throw new Error("Erro de formatação na resposta do Gemini (JSON fail).")
     }
 
     let questionsList = parsedData.questions || []
-
-    // Validação das questões geradas (Forçando 10 max se vieram 11)
     if (questionsList.length === 0) {
         throw new Error("A Inteligência Artificial não retornou as perguntas solicitadas.")
     }
     
-    if (questionsList.length > 10) {
-        questionsList = questionsList.slice(0, 10);
-    }
+    if (questionsList.length > 10) questionsList = questionsList.slice(0, 10);
 
-    // 5. Retornar
     return new Response(JSON.stringify({
       questions: questionsList,
       basedOnMaterials: basedOnMaterials
@@ -151,7 +127,7 @@ ${contextText}
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
-    console.error('Erro na geração do quiz (generate-quiz):', error.message)
+    console.error('Erro na geração do quiz (Gemini):', error.message)
     return new Response(JSON.stringify({ error: error.message }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
