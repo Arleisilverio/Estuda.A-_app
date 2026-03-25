@@ -117,8 +117,8 @@ ${contextText}
         throw new Error(`Ação inválida: "${action}". Use: summary, guide ou citations.`)
     }
 
-    // MODELO: gemini-1.5-flash (estável e disponível publicamente)
-    const geminiModel = 'gemini-1.5-flash'
+    // MODELO: gemini-2.5-flash
+    const geminiModel = 'gemini-2.5-flash'
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${googleKey}`
 
     const aiResponse = await fetch(geminiUrl, {

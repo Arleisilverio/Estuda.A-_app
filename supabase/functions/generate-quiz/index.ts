@@ -87,8 +87,8 @@ MATERIAIS DE APOIO (CONHECIMENTO RAG):
 ${contextText}
 """`
 
-    // CORREÇÃO: usar gemini-1.5-flash (estável e disponível na API pública)
-    const geminiModel = 'gemini-1.5-flash'
+    // CORREÇÃO: usar gemini-2.5-flash
+    const geminiModel = 'gemini-2.5-flash'
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${googleKey}`
 
     const aiResponse = await fetch(geminiUrl, {
