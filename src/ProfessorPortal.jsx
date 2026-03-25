@@ -810,7 +810,7 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                         <select 
                             value={selectedSubject?.id || ''} 
                             onChange={(e) => {
-                                const subj = subjects.find(s => s.id === parseInt(e.target.value))
+                                const subj = subjects.find(s => s.id === e.target.value)
                                 if (subj) setSelectedSubject(subj)
                             }}
                             className="w-full bg-estuda-bg border border-estuda-primary/20 rounded-2xl p-4 text-sm font-black text-white focus:outline-none focus:ring-2 focus:ring-estuda-primary/30 transition-all appearance-none cursor-pointer mb-4"
