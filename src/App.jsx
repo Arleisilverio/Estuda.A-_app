@@ -33,7 +33,10 @@ import {
     Mail,
     Fingerprint,
     CheckCircle,
-    Check
+    Check,
+    Bell,
+    BellRing,
+    X
 } from 'lucide-react'
 
 // Imagens para o carrossel
@@ -182,6 +185,8 @@ function App() {
     const [showDevPopup, setShowDevPopup] = useState(false)
     const [isNavVisible, setIsNavVisible] = useState(true)
     const [lastScrollY, setLastScrollY] = useState(0)
+    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+    const [readNotifications, setReadNotifications] = useState(() => JSON.parse(localStorage.getItem('estuda_read_notifications') || '[]'))
 
     // Biometria
     const [biometrySupported, setBiometrySupported] = useState(false)
@@ -1254,6 +1259,25 @@ Pergunta do Aluno: ${query}`;
         return <ProfessorPortal session={session} onLogout={() => supabase.auth.signOut()} isAdmin={isAdmin} setViewingProfessorPortal={setViewingProfessorPortal} />
     }
 
+    // Calcula anotações ativas
+    const activeNotifications = subjects.filter(s => 
+        s.professor_notes && 
+        s.notes_updated_at && 
+        !readNotifications.includes(`${s.id}_${s.notes_updated_at}`)
+    )
+
+    const dismissNotification = (id, updatedAt) => {
+        const key = `${id}_${updatedAt}`
+        const updated = [...readNotifications, key]
+        setReadNotifications(updated)
+        localStorage.setItem('estuda_read_notifications', JSON.stringify(updated))
+        
+        // Se foi a última, fecha o dropdown
+        if (activeNotifications.length <= 1) {
+            setIsNotificationsOpen(false)
+        }
+    }
+
     return (
         <div className="min-h-screen bg-estuda-bg text-estuda-text selection:bg-estuda-primary selection:text-estuda-bg transition-colors duration-500">
             {/* Header */}
@@ -1263,7 +1287,73 @@ Pergunta do Aluno: ${query}`;
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <div className="text-right flex flex-col justify-center">
+                    {/* Sino de Notificações */}
+                    <div className="relative z-50">
+                        <button
+                            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                            className="relative size-11 sm:size-12 rounded-2xl p-0.5 transition-all overflow-hidden flex items-center justify-center hover:bg-estuda-primary/10 text-estuda-primary/60 hover:text-estuda-primary"
+                        >
+                            {activeNotifications.length > 0 ? (
+                                <>
+                                    <BellRing size={24} className="animate-pulse text-estuda-primary drop-shadow-[0_0_10px_rgba(74,144,226,0.6)]" />
+                                    <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 rounded-full bg-red-500 border border-estuda-bg shadow-[0_0_8px_rgba(239,68,68,1)]" />
+                                </>
+                            ) : (
+                                <Bell size={24} />
+                            )}
+                        </button>
+
+                        {/* Dropdown de Notificações */}
+                        {isNotificationsOpen && (
+                            <div className="absolute right-0 mt-3 w-[85vw] max-w-sm glass rounded-3xl shadow-2xl border border-estuda-primary/20 py-4 px-4 sm:px-5 flex flex-col gap-3 z-50 animate-fade-in origin-top-right">
+                                <h3 className="text-sm font-black text-white/90 flex items-center gap-2 mb-1">
+                                    <Bell size={16} className="text-estuda-primary" /> Notificações
+                                </h3>
+                                
+                                <div className="max-h-[60vh] overflow-y-auto space-y-3 custom-scrollbar">
+                                    {activeNotifications.length === 0 ? (
+                                        <div className="py-6 text-center text-white/40">
+                                            <CheckCircle size={32} className="mx-auto mb-2 opacity-50" />
+                                            <p className="text-xs font-semibold">Tudo lido por enquanto!</p>
+                                        </div>
+                                    ) : (
+                                        activeNotifications.map(subj => {
+                                            const date = new Date(subj.notes_updated_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+                                            const time = new Date(subj.notes_updated_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                                            
+                                            return (
+                                                <div key={`${subj.id}_${subj.notes_updated_at}`} className="bg-estuda-surface border border-estuda-primary/10 rounded-2xl p-4 relative group hover:border-estuda-primary/30 transition-all">
+                                                    <div className="flex gap-3 relative z-10">
+                                                        <div className="size-10 rounded-xl bg-estuda-primary/10 flex items-center justify-center text-xl shrink-0">
+                                                            {subj.icon}
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <div className="flex items-start justify-between">
+                                                                <h4 className="text-xs font-bold text-white mb-0.5 pr-6 leading-tight">{subj.name}</h4>
+                                                            </div>
+                                                            <span className="text-[9px] font-bold text-estuda-primary/80 uppercase tracking-widest block mb-2">{date} às {time}</span>
+                                                            <p className="text-xs text-white/70 whitespace-pre-wrap leading-snug">{subj.professor_notes}</p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Botão de Excluir */}
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); dismissNotification(subj.id, subj.notes_updated_at); }}
+                                                        className="absolute top-2 right-2 size-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-20"
+                                                        title="Apagar para mim"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            )
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="text-right flex flex-col justify-center hidden sm:flex">
                         <p className="text-sm font-black text-white leading-tight">
                             {perfil.nome ? perfil.nome.split(' ')[0] : 'Estudante'}
                         </p>
