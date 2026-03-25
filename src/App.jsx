@@ -580,22 +580,67 @@ function App() {
     }, [carouselSlides.length])
 
     const fetchProfile = async (uid) => {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', uid)
-            .single()
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', uid)
+                .single()
 
-        if (data && !error) {
-            setPerfil({
-                nome: data.name || '',
-                curso: data.course || '',
-                periodo: data.period || '',
-                turma: data.class_group || '',
-                turno: data.shift || '',
-                avatar: data.avatar_url || null
-            })
-            setUserRole(data.user_role || 'student')
+            if (data && !error) {
+                setPerfil({
+                    nome: data.name || '',
+                    curso: data.course || '',
+                    periodo: data.period || '',
+                    turma: data.class_group || '',
+                    turno: data.shift || '',
+                    avatar: data.avatar_url || null
+                })
+                setUserRole(data.user_role || 'student')
+            } else if (error && (error.code === 'PGRST116' || error.message.includes('No rows found'))) {
+                // Perfil não existe, vamos criar um inicial para este novo usuário
+                console.log('Profile not found, creating initial profile for:', uid)
+                
+                // 1. Verificar se o e-mail está na lista de professores autorizados
+                const userEmail = session.user.email?.toLowerCase()
+                let initialRole = 'student'
+                
+                if (userEmail) {
+                    const { data: authProf } = await supabase
+                        .from('authorized_professor_emails')
+                        .select('email')
+                        .eq('email', userEmail)
+                        .single()
+                    
+                    if (authProf) {
+                        console.log('Email authorized as Professor!')
+                        initialRole = 'professor'
+                    }
+                }
+
+                // Super Admin bypass
+                if (userEmail === 'arlei85@hotmail.com') initialRole = 'admin'
+
+                // 2. Criar o perfil
+                const { error: insertError } = await supabase
+                    .from('profiles')
+                    .insert({
+                        id: uid,
+                        name: session.user.email?.split('@')[0] || 'Novo Usuário',
+                        user_role: initialRole,
+                        updated_at: new Date()
+                    })
+                
+                if (insertError) throw insertError
+                
+                // 3. Atualizar estado local
+                setUserRole(initialRole)
+                setPerfil(prev => ({ ...prev, nome: session.user.email?.split('@')[0] || 'Novo Usuário' }))
+            }
+        } catch (err) {
+            console.error('Erro ao buscar/criar perfil:', err)
+            // Fallback para não travar o app
+            setUserRole('student')
         }
     }
 

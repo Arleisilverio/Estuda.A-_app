@@ -27,7 +27,11 @@ import {
     ArrowLeft,
     GraduationCap,
     Menu,
-    MoreVertical
+    MoreVertical,
+    Check,
+    X,
+    BookOpen,
+    Quote
 } from 'lucide-react'
 
 export default function ProfessorPortal({ session, onLogout, isAdmin, setViewingProfessorPortal }) {
@@ -60,12 +64,21 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
     const [showExamForm, setShowExamForm] = useState(false)
     const [newExam, setNewExam] = useState({ title: '', subject: '', subtitle: '', date: '', time: '' })
     
-    // Estado para Geração de Provas por IA
-    const [isGeneratingExam, setIsGeneratingExam] = useState(false)
-    const [examDailyLimits, setExamDailyLimits] = useState({}) // { subjectId: count }
+    const [exams, setExams] = useState([])
+    
+    // Estados do Chat Unificado (Igual ao App.jsx)
+    const [showDocSelect, setShowDocSelect] = useState(false)
+    const [selectedDocId, setSelectedDocId] = useState('') // '' significa "Todos"
+    const [pendingAction, setPendingAction] = useState(null)
+    const [quizMode, setQuizMode] = useState(false)
+    const [quizQuestions, setQuizQuestions] = useState([])
+    const [quizAnswers, setQuizAnswers] = useState([])
+    const [quizResult, setQuizResult] = useState(null)
+    const [isThinking, setIsThinking] = useState(false)
+    
+    // Estado para Anotações do Professor
     const [professorNote, setProfessorNote] = useState('')
     const [savingNote, setSavingNote] = useState(false)
-    const [exams, setExams] = useState([])
 
 
     useEffect(() => {
@@ -101,6 +114,8 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
     const fetchProfessorData = async () => {
         try {
             setLoading(true)
+            console.log('Fetching professor data for:', session.user.id)
+            
             // Buscar as matérias vinculadas ao professor
             const { data: profData, error: profError } = await supabase
                 .from('professors')
@@ -110,25 +125,29 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
             if (profError) throw profError
             
             if (profData && profData.length > 0) {
+                console.log('Professor data found:', profData)
                 const subjs = profData.map(p => p.subjects).filter(Boolean)
+                console.log('Extracted subjects:', subjs)
+                
+                // Primeiro atualizamos os dados principais
                 setSubjects(subjs)
                 if (subjs.length > 0) setSelectedSubject(subjs[0])
                 
-                // Salvar info do professor (pegando do primeiro registro vinculante)
                 setProfessorInfo({
                     name: profData[0].name || session.user.email,
                     avatar: profData[0].avatar_url
                 })
-                
-                setShowOnboarding(false)
 
                 // Inicializar estados de edição
                 setEditProfileName(profData[0].name || session.user.email)
                 setEditProfileAvatar(profData[0].avatar_url)
                 setEditProfileSubjectIds(profData.map(p => p.subject_id))
+                
+                // SÓ ENTÃO desativamos o onboarding e o loading
+                setShowOnboarding(false)
             } else if (isAdmin) {
                 // Se for ADM/Super Admin, vamos carregar todas as matérias para ele gerenciar
-                console.log('User is Admin/SuperAdmin, bypassing professor onboarding and loading all subjects.')
+                console.log('User is Admin/SuperAdmin, bypassing professor onboarding.')
                 const { data: allSubjs } = await supabase.from('subjects').select('*')
                 if (allSubjs) {
                     setSubjects(allSubjs)
@@ -138,6 +157,7 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                 setShowOnboarding(false)
             } else {
                 // Se não tiver dados e não for ADM, inicia onboarding
+                console.log('No professor data found, showing onboarding.')
                 setShowOnboarding(true)
                 const { data: allSubjs } = await supabase.from('subjects').select('*')
                 if (allSubjs) setAllAvailableSubjects(allSubjs)
@@ -217,59 +237,75 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
         }
     }
 
-    const handleGenerateExam = async (subject) => {
-        const today = new Date().toISOString().split('T')[0]
-        const limitKey = `${subject.id}_${today}`
-        const currentCount = examDailyLimits[limitKey] || 0
-        
-        if (currentCount >= 2) {
-            alert(`Limite diário atingido para ${subject.name}. Você pode gerar no máximo 2 provas por dia por matéria.`)
+    // Lógica Unificada de Ações de IA
+    const handleActionClick = (action) => {
+        if (!selectedSubject) {
+            alert('Selecione uma matéria primeiro.')
             return
         }
+        setPendingAction(action)
+        setShowDocSelect(true)
+    }
 
+    const executePendingAction = async (action, docId) => {
+        if (!selectedSubject) return
+        
+        setLoading(true)
+        setIsThinking(true)
+        
         try {
-            setIsGeneratingExam(true)
-            const { data, error } = await supabase.functions.invoke('generate-quiz', {
-                body: { subjectId: subject.id, limit: 10 }
-            })
-
-            if (error) throw error
-            
-            setExamDailyLimits(prev => ({
-                ...prev,
-                [limitKey]: currentCount + 1
-            }))
-            
-            const quizList = data?.questions || []
-            if (quizList.length === 0) {
-                alert(`Nenhuma questão gerada.`)
-                return
-            }
-            
-            let visibleText = `📚 **QUIZ: ${subject.name}**\n\nResponda as questões abaixo e eu irei corrigi-las para você e explicar os erros!\n\n`
-            let internalAnswers = `\n\n[GABARITO OCULTO - IA, USE ISTO PARA CORRIGIR AS RESPOSTAS DO USUÁRIO PARA ESTE QUIZ]:\n`
-            
-            quizList.forEach((q, i) => {
-                visibleText += `**${i+1}. ${q.question}**\n`
-                if (q.options) {
-                    q.options.forEach((opt, j) => {
-                        visibleText += `${['A','B','C','D'][j]}) ${opt}\n`
-                    })
+            if (action === 'quiz') {
+                const { data, error } = await supabase.functions.invoke('generate-quiz', {
+                    body: { subjectId: selectedSubject.id, documentId: docId || null, limit: 10 }
+                })
+                if (error) throw error
+                
+                const questions = data.questions || []
+                if (questions.length > 0) {
+                    setQuizQuestions(questions)
+                    setQuizAnswers(new Array(questions.length).fill(undefined))
+                    setQuizMode(true)
+                    setQuizResult(null)
                 }
-                visibleText += '\n'
-                internalAnswers += `Questão ${i+1} Correta: ${q.answer}. Explicação Base: ${q.explanation}\n`
-            })
-            
-            setMessages(prev => [...prev, { 
-                role: 'assistant', 
-                content: visibleText.trim(),
-                internalContext: internalAnswers
-            }])
+            } else {
+                const { data, error } = await supabase.functions.invoke('notebooklm-actions', {
+                    body: { action, subjectId: selectedSubject.id, documentId: docId || null }
+                })
+                if (error) throw error
+                
+                const newMsg = { 
+                    role: 'assistant', 
+                    content: data.result, 
+                    type: action,
+                    source: docId ? documents.find(d => d.id === docId)?.name : 'Todos os Materiais'
+                }
+                setMessages(prev => [...prev, newMsg])
+            }
         } catch (err) {
-            alert('Erro ao gerar prova: ' + err.message)
+            console.error('Erro na ação de IA:', err)
+            alert('Não foi possível completar a ação. Verifique se o material foi processado.')
         } finally {
-            setIsGeneratingExam(false)
+            setLoading(false)
+            setIsThinking(false)
         }
+    }
+
+    const handleQuizAnswer = (questionIdx, optionIdx) => {
+        const newAnswers = [...quizAnswers]
+        newAnswers[questionIdx] = optionIdx
+        setQuizAnswers(newAnswers)
+    }
+
+    const finishQuiz = () => {
+        let score = 0
+        quizQuestions.forEach((q, idx) => {
+            if (quizAnswers[idx] === q.answer || q.options[quizAnswers[idx]] === q.answer) {
+                score++
+            }
+        })
+        
+        const percentage = Math.round((score / quizQuestions.length) * 100)
+        setQuizResult({ score, percentage })
     }
 
     useEffect(() => {
@@ -331,10 +367,14 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
 
     const handleOnboardingSubmit = async (e) => {
         e.preventDefault()
-        if (!onboardingName.trim() || onboardingSubjectIds.length === 0) return
+        if (!onboardingName.trim() || onboardingSubjectIds.length === 0) {
+            alert('Por favor, preencha seu nome e escolha as matérias.')
+            return
+        }
 
         try {
             setLoading(true)
+            console.log('Submitting onboarding for:', onboardingName)
             
             // Inserir uma linha para cada matéria selecionada
             const profInserts = onboardingSubjectIds.map(subjId => ({
@@ -350,10 +390,14 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                 .insert(profInserts)
             
             if (error) throw error
-            fetchProfessorData() // Recarregar dados após insert
+            
+            console.log('Onboarding data inserted successfully. Fetching data...')
+            // ESSENCIAL: Aguarda o fetch terminar antes de encerrar este fluxo de loading
+            await fetchProfessorData()
+            
         } catch (err) {
-            alert('Erro no onboarding: ' + err.message)
-        } finally {
+            console.error('Erro no onboarding:', err)
+            alert('Erro ao salvar dados: ' + err.message)
             setLoading(false)
         }
     }
@@ -460,44 +504,60 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
         }
     }
 
-    const handleAskIA = async (overrideQuery = null) => {
-        const textToAsk = typeof overrideQuery === 'string' ? overrideQuery : query
-        if (!textToAsk.trim() || !selectedSubject) return
-        
-        const userMsg = { role: 'user', content: textToAsk }
-        setMessages(prev => [...prev, userMsg])
-        if (!overrideQuery || typeof overrideQuery !== 'string') setQuery('')
-        setLoading(true)
+    const handleAskIA = async (customQuery = null) => {
+        const textToAsk = customQuery || query;
+        if (!textToAsk.trim() || !selectedSubject) return;
+
+        const userMessage = { role: 'user', content: textToAsk };
+        setMessages(prev => [...prev, userMessage]);
+        setQuery('');
+        setIsThinking(true);
 
         try {
-            const chatHistory = messages.map(msg => ({
-                role: msg.role === 'assistant' ? 'model' : 'user',
-                text: msg.content + (msg.internalContext || '')
-            }))
+            // Reforço as instruções de RAG iguais às do aluno
+            const ragQuery = `IMPORTANTE: RESPONDA APENAS COM BASE NOS MATERIAIS FORNECIDOS PELO PROFESSOR.
+            Responda de forma clara e profissional:
+            - Use listas (•) para múltiplos pontos
+            - Use negrito (**termo**) para conceitos chave
+            - Use espaçamento duplo entre parágrafos
+            - Se a informação não estiver nos materiais, diga que não encontrou no conteúdo da disciplina.
+            
+            Pergunta do Professor (Validação): ${textToAsk}`;
 
             const { data, error } = await supabase.functions.invoke('ask-ai', {
-                body: { 
-                    query: textToAsk, 
-                    subjectId: selectedSubject.id,
-                    mode: 'curation',
-                    chatHistory: chatHistory
+                body: {
+                    query: ragQuery,
+                    subjectId: selectedSubject?.id,
+                    messages: messages.slice(-5)
                 }
-            })
+            });
 
-            if (error) throw error
-            setMessages(prev => [...prev, { role: 'assistant', content: data.answer }])
-        } catch (err) {
-            setMessages(prev => [...prev, { role: 'assistant', content: 'Erro ao consultar IA: ' + err.message }])
+            if (error) throw error;
+
+            const aiMessage = { 
+                role: 'assistant', 
+                content: data.answer, 
+                source: data.sources && data.sources.length > 0 ? data.sources[0] : null,
+                type: 'chat'
+            };
+            setMessages(prev => [...prev, aiMessage]);
+        } catch (error) {
+            console.error('Erro ao perguntar:', error);
+            alert('Erro na comunicação com a IA: ' + error.message);
         } finally {
-            setLoading(false)
+            setIsThinking(false);
         }
-    }
+    };
 
-    if (loading && subjects.length === 0 && !showOnboarding) {
+    if (loading && !showOnboarding) {
         return (
-            <div className="min-h-screen bg-estuda-bg flex flex-col items-center justify-center p-6">
-                <Loader2 className="animate-spin text-estuda-primary mb-4" size={48} />
-                <p className="text-white/40 font-bold uppercase tracking-widest text-xs">Carregando Portal do Professor...</p>
+            <div className="min-h-screen bg-estuda-bg flex flex-col items-center justify-center p-6 text-center">
+                <div className="relative mb-8">
+                    <div className="absolute inset-0 bg-estuda-primary/20 blur-2xl rounded-full animate-pulse"></div>
+                    <Loader2 className="animate-spin text-estuda-primary relative z-10" size={64} />
+                </div>
+                <h2 className="text-xl font-black text-white mb-2 animate-pulse">Quase lá!</h2>
+                <p className="text-white/30 font-bold uppercase tracking-[0.2em] text-[10px]">Configurando o Portal do Professor...</p>
             </div>
         )
     }
@@ -862,107 +922,283 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
 
                 {/* Coluna Direita: Chat de Validação */}
                 <div className="lg:col-span-8 flex flex-col bg-estuda-surface border border-estuda-primary/10 rounded-[2.5rem] shadow-2xl overflow-hidden min-h-[600px]">
-                    <div className="p-6 border-b border-estuda-primary/10 flex items-center justify-between bg-white/[0.02]">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-estuda-primary/10 rounded-xl text-estuda-primary">
-                                <Sparkles size={20} />
+                    <div className="p-4 sm:p-6 border-b border-estuda-primary/10 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/[0.02]">
+                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                            <div className="p-2 bg-estuda-primary/10 rounded-xl text-estuda-primary shrink-0">
+                                {quizMode ? <FileQuestion size={20} /> : <Sparkles size={20} />}
                             </div>
-                            <div>
-                                <h3 className="text-sm font-black text-white">{selectedSubject?.name || 'Selecione uma Matéria'}</h3>
-                                <p className="text-[10px] opacity-50 font-bold uppercase tracking-widest">Validação do Professor Virtual</p>
+                            <div className="min-w-0">
+                                <h3 className="text-sm font-black text-white truncate">{selectedSubject?.name || 'Selecione uma Matéria'}</h3>
+                                <p className="text-[10px] opacity-50 font-bold uppercase tracking-widest truncate">
+                                    {quizMode ? 'Quiz em Execução' : 'Validação do Professor Virtual'}
+                                </p>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-3 relative group">
-                            <button 
-                                disabled={isGeneratingExam || !selectedSubject}
-                                className="bg-estuda-primary text-white p-2.5 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-estuda-primary/20 flex items-center justify-center disabled:opacity-50"
-                            >
-                                {isGeneratingExam ? <Loader2 size={16} className="animate-spin" /> : <Menu size={16} />}
-                            </button>
-                            <div className="absolute right-0 top-full mt-2 w-48 bg-estuda-surface border border-white/10 rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden flex flex-col">
-                                <button 
-                                    onClick={() => handleGenerateExam(selectedSubject)}
-                                    className="w-full text-left px-4 py-3 text-xs font-bold text-white hover:bg-white/5 transition-colors flex items-center gap-2"
+                        {/* Botões de Ação de IA Unificados */}
+                        {!quizMode && (
+                            <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 scrollbar-hide">
+                                <button
+                                    onClick={() => handleActionClick('summary')}
+                                    className="bg-estuda-primary text-white px-3 py-2 rounded-xl font-black flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg text-[10px] uppercase tracking-tighter shrink-0"
                                 >
-                                    <FileQuestion size={14} className="text-estuda-primary" />
-                                    Gerar Quiz (10)
+                                    <Sparkles size={14} /> Resumo
                                 </button>
-                                <button 
-                                    onClick={() => handleAskIA("Gere um resumo detalhado dos meus materiais e anotações para facilitar a revisão dos alunos. Divida em tópicos principais.")}
-                                    className="w-full text-left px-4 py-3 text-xs font-bold text-white hover:bg-white/5 transition-colors flex items-center gap-2 border-t border-white/5"
+                                <button
+                                    onClick={() => handleActionClick('guide')}
+                                    className="bg-blue-600 text-white px-3 py-2 rounded-xl font-black flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg text-[10px] uppercase tracking-tighter shrink-0"
                                 >
-                                    <FileText size={14} className="text-blue-400" />
-                                    Gerar Resumo
+                                    <BookOpen size={14} /> Guia
+                                </button>
+                                <button
+                                    onClick={() => handleActionClick('citations')}
+                                    className="bg-emerald-600 text-white px-3 py-2 rounded-xl font-black flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg text-[10px] uppercase tracking-tighter shrink-0"
+                                >
+                                    <Quote size={14} /> Citações
+                                </button>
+                                <button
+                                    onClick={() => handleActionClick('quiz')}
+                                    className="bg-estuda-primary text-white px-3 py-2 rounded-xl font-black flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg text-[10px] uppercase tracking-tighter shrink-0"
+                                >
+                                    <FileQuestion size={14} /> Quiz (10)
                                 </button>
                             </div>
-                        </div>
+                        )}
+
+                        {quizMode && (
+                            <button 
+                                onClick={() => { setQuizMode(false); setQuizResult(null); }}
+                                className="text-[10px] font-black uppercase text-white/40 hover:text-white transition-colors flex items-center gap-2"
+                            >
+                                <ChevronLeft size={14} /> Cancelar Quiz
+                            </button>
+                        )}
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-estuda-bg/5">
-                        {messages.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-center p-12 opacity-30">
-                                <MessageSquare size={48} className="mb-4" />
-                                <h4 className="text-lg font-black mb-2 uppercase tracking-widest">Inicie a Validação</h4>
-                                <p className="text-xs max-w-xs font-bold leading-relaxed px-4 opacity-60">Teste se a IA aprendeu corretamente o conteúdo dos seus PDFs antes de liberar para os alunos.</p>
-                                
-                                <div className="mt-8 grid grid-cols-2 gap-3 w-full max-w-sm">
-                                    <button onClick={() => setQuery("Gere um resumo dos meus materiais")} className="p-3 bg-white/5 border border-white/5 rounded-2xl text-[10px] font-black hover:bg-white/10 transition-all uppercase">Gere um resumo</button>
-                                    <button onClick={() => setQuery("Crie 3 perguntas difíceis")} className="p-3 bg-white/5 border border-white/5 rounded-2xl text-[10px] font-black hover:bg-white/10 transition-all uppercase">Crie perguntas</button>
-                                </div>
+                    <div className="flex-1 overflow-hidden flex flex-col relative">
+                        {quizMode ? (
+                            /* Layout do Quiz Interativo */
+                            <div className="flex-1 overflow-hidden flex flex-col">
+                                {!quizResult ? (
+                                    <>
+                                        {/* Status Fixo do Quiz */}
+                                        <div className="bg-estuda-bg/50 p-4 border-b border-estuda-primary/10 flex justify-between items-center shrink-0">
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-[10px] font-black uppercase opacity-60">Status do Quiz de Validação</span>
+                                                <span className="text-sm font-bold">{quizAnswers.filter(a => a !== undefined).length} de 10 respondidas</span>
+                                            </div>
+                                            <button
+                                                onClick={finishQuiz}
+                                                disabled={quizAnswers.filter(a => a !== undefined).length < 10}
+                                                className={`px-6 py-2 rounded-xl font-bold transition-all ${quizAnswers.filter(a => a !== undefined).length === 10 ? 'bg-estuda-primary text-white' : 'bg-estuda-primary/20 text-estuda-primary/40 cursor-not-allowed'}`}
+                                            >
+                                                FINALIZAR
+                                            </button>
+                                        </div>
+
+                                        {/* Lista de Questões com Scroll */}
+                                        <div className="flex-1 overflow-y-auto p-6 sm:p-10 flex flex-col gap-8 custom-scrollbar bg-estuda-bg/30">
+                                            {quizQuestions.map((q, qIdx) => (
+                                                <div key={q.id || qIdx} className="bg-estuda-surface p-6 sm:p-8 rounded-[2rem] border border-estuda-primary/10 animate-fade-in shadow-xl">
+                                                    <h3 className="text-lg font-bold mb-6 leading-relaxed">
+                                                        <span className="text-estuda-primary mr-2">#{qIdx + 1}</span> {q.question}
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 gap-3">
+                                                        {q.options.map((opt, oIdx) => (
+                                                            <button
+                                                                key={oIdx}
+                                                                onClick={() => handleQuizAnswer(qIdx, oIdx)}
+                                                                className={`p-4 rounded-2xl border transition-all text-left font-bold flex items-center gap-4 ${quizAnswers[qIdx] === oIdx ? 'bg-estuda-primary text-white border-estuda-primary shadow-lg' : 'border-estuda-primary/10 bg-estuda-bg/50 hover:bg-estuda-primary/10 text-white/70'}`}
+                                                            >
+                                                                <span className={`size-8 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${quizAnswers[qIdx] === oIdx ? 'bg-white/20' : 'bg-estuda-primary/10 text-estuda-primary'}`}>
+                                                                    {['A', 'B', 'C', 'D'][oIdx]}
+                                                                </span>
+                                                                <span className="text-sm">{opt}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <div className="py-12 text-center">
+                                                <button
+                                                    onClick={finishQuiz}
+                                                    disabled={quizAnswers.filter(a => a !== undefined).length < 10}
+                                                    className={`px-12 py-4 rounded-2xl font-black text-lg transition-all shadow-xl ${quizAnswers.filter(a => a !== undefined).length === 10 ? 'bg-estuda-primary text-white hover:scale-105 active:scale-95' : 'bg-estuda-primary/20 text-estuda-primary/40 cursor-not-allowed'}`}
+                                                >
+                                                    ENVIAR PARA VALIDAÇÃO
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    /* Resultado do Quiz */
+                                    <div className="flex-1 flex flex-col p-8 animate-fade-in text-center overflow-y-auto bg-estuda-bg/20">
+                                        <div className="flex flex-col items-center justify-center text-center">
+                                            <div className="size-24 rounded-[2rem] bg-estuda-primary text-white flex items-center justify-center mb-6 shadow-2xl shrink-0">
+                                                <GraduationCap size={48} />
+                                            </div>
+                                            <h3 className="text-3xl font-black mb-2">Quiz Finalizado!</h3>
+                                            <p className="text-estuda-primary font-bold mb-8 opacity-60 uppercase tracking-widest text-[10px]">Ótimo desempenho em {selectedSubject?.name}</p>
+
+                                            <div className="flex justify-center gap-8 mb-10 w-full max-w-sm">
+                                                <div className="flex-1 bg-estuda-bg/50 p-6 rounded-3xl border border-estuda-primary/10 shadow-xl">
+                                                    <p className="text-4xl font-black text-estuda-primary">{quizResult.score}</p>
+                                                    <p className="text-[10px] uppercase font-black opacity-40 mt-1">Acertos</p>
+                                                </div>
+                                                <div className="flex-1 bg-estuda-bg/50 p-6 rounded-3xl border border-estuda-primary/10 shadow-xl">
+                                                    <p className="text-4xl font-black text-estuda-primary">{quizResult.percentage}%</p>
+                                                    <p className="text-[10px] uppercase font-black opacity-40 mt-1">Aproveitamento</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex justify-center pt-4 border-t border-estuda-primary/10">
+                                                <button
+                                                    onClick={() => { setQuizMode(false); setQuizResult(null); }}
+                                                    className="px-8 py-3 rounded-2xl font-black text-sm border-2 border-estuda-primary/20 hover:bg-estuda-primary/10 transition-colors"
+                                                >
+                                                    Voltar ao Chat
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Correção e Feedback */}
+                                        <div className="mt-8 pt-4 text-left">
+                                            <h4 className="text-xl font-black text-white mb-6 flex items-center gap-2">
+                                                <MessageSquare size={20} className="text-estuda-primary" /> Correção e Feedback
+                                            </h4>
+                                            <div className="flex flex-col gap-6">
+                                                {quizQuestions.map((q, qIdx) => {
+                                                    const userAnswer = quizAnswers[qIdx]
+                                                    const isCorrect = userAnswer === q.answer || q.options[userAnswer] === q.answer
+                                                    
+                                                    return (
+                                                        <div key={qIdx} className={`p-6 rounded-3xl border ${isCorrect ? 'bg-green-500/5 border-green-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
+                                                            <p className="font-bold text-sm mb-4 text-white leading-relaxed">
+                                                                <span className={`inline-block size-6 rounded-lg text-center leading-6 text-[10px] font-black mr-3 ${isCorrect ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-500'}`}>
+                                                                    {qIdx + 1}
+                                                                </span>
+                                                                {q.question}
+                                                            </p>
+                                                            <div className="text-xs space-y-2 mt-2">
+                                                                <div className="flex items-center gap-2 text-white/50">
+                                                                    <span className="font-bold w-16 shrink-0">Sua resp:</span> 
+                                                                    <span className={isCorrect ? 'text-green-400 font-bold' : 'text-red-400 line-through'}>{q.options[userAnswer] || "Não respondeu"}</span>
+                                                                </div>
+                                                                {!isCorrect && (
+                                                                    <div className="flex items-center gap-2 text-white/50">
+                                                                        <span className="font-bold w-16 shrink-0">Correta:</span>
+                                                                        <span className="text-green-400 font-bold">{q.options[q.answer] || q.answer}</span>
+                                                                    </div>
+                                                                )}
+                                                                {q.explanation && (
+                                                                    <div className="mt-4 p-4 rounded-xl bg-estuda-surface border border-estuda-primary/20">
+                                                                        <div className="flex items-start gap-2">
+                                                                            <BookOpen size={16} className="text-estuda-primary shrink-0 mt-0.5" />
+                                                                            <div>
+                                                                                <p className="text-[10px] font-black uppercase text-estuda-primary mb-1 tracking-widest">Explicação do Professor IA</p>
+                                                                                <p className="font-medium text-white/80 leading-relaxed">{q.explanation}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                )}  
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ) : (
-                            messages.map((msg, i) => (
-                                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-                                    <div className={`p-5 rounded-3xl max-w-[85%] text-sm leading-relaxed shadow-xl whitespace-pre-wrap ${
-                                        msg.role === 'user' 
-                                        ? 'bg-estuda-primary text-white ml-12 rounded-tr-none' 
-                                        : 'bg-estuda-surface border border-white/5 mr-12 rounded-tl-none font-medium'
-                                    }`}>
-                                        {msg.content}
+                            /* Área de Mensagens do Chat — idêntica ao aluno */
+                            <div className="flex-1 flex flex-col overflow-hidden">
+                                <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-4 custom-scrollbar bg-estuda-bg/5">
+                                    {messages.length === 0 ? (
+                                        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 opacity-20">
+                                            <MessageSquare size={64} className="mb-4" />
+                                            <h3 className="text-xl font-bold">Inicie a Validação</h3>
+                                            <p className="text-sm font-medium max-w-xs mx-auto">Use os botões acima para gerar Resumo, Guia, Citações ou Quiz dos materiais de {selectedSubject?.name}.</p>
+                                        </div>
+                                    ) : (
+                                        messages.map((msg, i) => (
+                                            <div
+                                                key={i}
+                                                className={`flex flex-col max-w-[85%] sm:max-w-[70%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'} animate-fade-in`}
+                                            >
+                                                <div className={`p-4 sm:p-5 rounded-2xl text-xs sm:text-sm leading-relaxed max-w-full transition-all duration-500 relative whitespace-pre-wrap ${
+                                                        msg.role === 'user'
+                                                            ? 'bg-estuda-primary text-white font-medium shadow-lg'
+                                                            : msg.type === 'summary' 
+                                                                ? 'bg-purple-900/20 border-l-4 border-purple-500 text-white/90 shadow-[0_0_20px_rgba(168,85,247,0.1)]'
+                                                                : msg.type === 'guide'
+                                                                    ? 'bg-blue-900/20 border-l-4 border-blue-500 text-white/90 shadow-[0_0_20px_rgba(59,130,246,0.1)]'
+                                                                    : msg.type === 'citations'
+                                                                        ? 'bg-emerald-900/20 border-l-4 border-emerald-500 text-white/90 shadow-[0_0_20px_rgba(16,185,129,0.1)]'
+                                                                        : 'bg-white/5 text-white/90 border border-white/10'
+                                                    }`}>
+                                                    {msg.role === 'assistant' && msg.type && msg.type !== 'chat' && (
+                                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10">
+                                                            {msg.type === 'summary' && <><Sparkles size={16} className="text-purple-400" /> <span className="font-bold text-purple-400 uppercase tracking-wider text-[10px]">Resumo Estruturado</span></>}
+                                                            {msg.type === 'guide' && <><BookOpen size={16} className="text-blue-400" /> <span className="font-bold text-blue-400 uppercase tracking-wider text-[10px]">Guia de Estudo</span></>}
+                                                            {msg.type === 'citations' && <><Quote size={16} className="text-emerald-400" /> <span className="font-bold text-emerald-400 uppercase tracking-wider text-[10px]">Citações Diretas</span></>}
+                                                        </div>
+                                                    )}
+                                                    <div className="whitespace-pre-wrap prose prose-invert max-w-none prose-sm">
+                                                        {msg.content}
+                                                    </div>
+                                                    {msg.role === 'assistant' && msg.source && (
+                                                        <div className="mt-3 flex flex-wrap gap-1.5 pt-3 border-t border-white/10">
+                                                            <span className="text-[8px] font-bold bg-black/20 px-1.5 py-0.5 rounded border border-white/5 opacity-60 flex items-center gap-1">
+                                                                <FileText size={8} /> {msg.source}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <span className="text-[9px] font-black uppercase opacity-30 mt-1 tracking-widest">{msg.role === 'user' ? 'Você' : 'Professor IA'}</span>
+                                            </div>
+                                        ))
+                                    )}
+                                    {isThinking && (
+                                        <div className="self-start flex flex-col items-start animate-pulse">
+                                            <div className="bg-estuda-surface p-4 rounded-2xl border border-estuda-primary/10 flex items-center gap-2">
+                                                <Loader2 size={16} className="animate-spin text-estuda-primary" />
+                                                <span className="text-xs font-bold opacity-60">O Professor está elaborando...</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Barra de Input */}
+                                <div className="p-4 bg-estuda-surface border-t border-estuda-primary/10 shrink-0">
+                                    <div className="max-w-4xl mx-auto relative flex items-end gap-3">
+                                        <div className="flex-1 relative">
+                                            <textarea
+                                                rows="1"
+                                                disabled={isThinking}
+                                                value={query}
+                                                onChange={(e) => setQuery(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                        e.preventDefault();
+                                                        handleAskIA();
+                                                    }
+                                                }}
+                                                placeholder={isThinking ? "Aguarde a IA responder..." : "Sua dúvida sobre a matéria..."}
+                                                className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl py-3.5 px-5 text-sm focus:outline-none focus:ring-2 focus:ring-estuda-primary/20 transition-all font-medium placeholder:text-estuda-primary/30 resize-none max-h-32 disabled:opacity-50"
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={handleAskIA}
+                                            disabled={isThinking || !query.trim()}
+                                            className="bg-estuda-primary text-white size-12 rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shrink-0 disabled:opacity-50 disabled:grayscale"
+                                        >
+                                            {isThinking ? <Loader2 className="animate-spin" size={20} /> : <ChevronRight size={20} />}
+                                        </button>
                                     </div>
                                 </div>
-                            ))
-                        )}
-                        {loading && (
-                            <div className="flex justify-start animate-pulse">
-                                <div className="bg-estuda-surface border border-white/5 p-4 rounded-3xl rounded-tl-none flex items-center gap-3">
-                                    <Loader2 className="animate-spin text-estuda-primary" size={16} />
-                                    <span className="text-[9px] font-black uppercase tracking-widest opacity-40">Processando conhecimento...</span>
-                                </div>
                             </div>
                         )}
-                    </div>
-
-                    <div className="p-6 bg-estuda-bg/30 border-t border-white/5">
-                        <div className="flex gap-3">
-                            <div className="flex-1 relative">
-                                <input 
-                                    type="text" 
-                                    placeholder="Pergunte sobre seus materiais..."
-                                    value={query}
-                                    onChange={e => setQuery(e.target.value)}
-                                    onKeyPress={e => e.key === 'Enter' && handleAskIA()}
-                                    className="w-full bg-estuda-bg border border-white/10 rounded-2xl py-5 px-6 text-sm focus:outline-none focus:ring-2 focus:ring-estuda-primary/20 transition-all font-bold placeholder:text-white/20"
-                                />
-                                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                    <button 
-                                        onClick={() => setShowExamForm(true)}
-                                        className="p-2 text-white/20 hover:text-estuda-primary transition-colors"
-                                        title="Agendar Prova Manualmente"
-                                    >
-                                        <Calendar size={18} />
-                                    </button>
-                                </div>
-                            </div>
-                            <button 
-                                onClick={handleAskIA}
-                                disabled={loading || !query.trim()}
-                                className="bg-estuda-primary text-white size-14 rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-estuda-primary/30 disabled:opacity-50"
-                            >
-                                <ChevronRight size={28} />
-                            </button>
-                        </div>
                     </div>
                 </div>
                 </div> {/* Fechamento do grid w-full */}
@@ -1196,6 +1432,113 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                         >
                             LI E CONCORDO
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Seletor de Material Avançado (Migrado do Aluno) */}
+            {showDocSelect && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-estuda-bg/90 backdrop-blur-xl animate-fade-in">
+                    <div className="bg-estuda-surface w-full max-w-2xl rounded-[3rem] border border-estuda-primary/20 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="p-8 border-b border-white/5 shrink-0">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-2xl font-black text-white">Onde a IA deve buscar?</h3>
+                                <button 
+                                    onClick={() => setShowDocSelect(false)}
+                                    className="p-3 hover:bg-white/5 rounded-2xl transition-all"
+                                >
+                                    <X size={24} className="opacity-40" />
+                                </button>
+                            </div>
+                            <p className="text-xs font-bold text-white/40 uppercase tracking-widest">
+                                Selecione o material base para {
+                                    pendingAction === 'quiz' ? 'o seu Quiz de 10 questões' :
+                                    pendingAction === 'summary' ? 'o seu Resumo Estruturado' :
+                                    pendingAction === 'guide' ? 'o seu Guia de Estudos' : 'as suas Citações'
+                                }
+                            </p>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar">
+                            <div className="grid gap-4">
+                                {/* Opção Todos os Materiais */}
+                                <button
+                                    onClick={() => setSelectedDocId('')}
+                                    className={`group relative flex items-center gap-6 p-6 rounded-[2rem] border transition-all text-left ${
+                                        selectedDocId === '' 
+                                        ? 'bg-estuda-primary border-estuda-primary shadow-2xl shadow-estuda-primary/20 scale-[1.02]' 
+                                        : 'bg-white/5 border-white/5 hover:border-estuda-primary/30 hover:bg-white/[0.08]'
+                                    }`}
+                                >
+                                    <div className={`size-14 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
+                                        selectedDocId === '' ? 'bg-white/20 text-white' : 'bg-estuda-primary/10 text-estuda-primary'
+                                    }`}>
+                                        <Sparkles size={28} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <h4 className="font-black text-lg">Biblioteca Completa</h4>
+                                            {selectedDocId === '' && <Check size={18} className="text-white animate-bounce-in" />}
+                                        </div>
+                                        <p className={`text-xs font-bold uppercase tracking-tighter ${selectedDocId === '' ? 'text-white/70' : 'text-white/30'}`}>
+                                            A IA usará todos os materiais disponíveis desta matéria
+                                        </p>
+                                    </div>
+                                </button>
+
+                                <div className="relative py-4 flex items-center gap-4">
+                                    <div className="flex-1 h-px bg-white/5"></div>
+                                    <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Ou escolha um arquivo</span>
+                                    <div className="flex-1 h-px bg-white/5"></div>
+                                </div>
+
+                                {/* Lista de Arquivos Individuais */}
+                                <div className="grid gap-3">
+                                    {documents.map(file => (
+                                        <button
+                                            key={file.id}
+                                            onClick={() => setSelectedDocId(file.id)}
+                                            className={`group relative flex items-center gap-5 p-5 rounded-2xl border transition-all text-left ${
+                                                selectedDocId === file.id 
+                                                ? 'bg-white/10 border-estuda-primary shadow-lg ring-1 ring-estuda-primary' 
+                                                : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] hover:border-white/10'
+                                            }`}
+                                        >
+                                            <div className={`size-12 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                                                selectedDocId === file.id ? 'bg-estuda-primary text-white' : 'bg-white/5 text-white/20'
+                                            }`}>
+                                                <FileText size={20} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className={`font-bold text-sm truncate ${selectedDocId === file.id ? 'text-white' : 'text-white/60'}`}>
+                                                        {file.name}
+                                                    </h4>
+                                                    {selectedDocId === file.id && <Check size={14} className="text-estuda-primary" />}
+                                                </div>
+                                                <p className="text-[10px] font-black opacity-30 uppercase tracking-tighter mt-0.5">Clique para selecionar</p>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-8 border-t border-white/5 bg-white/[0.02] shrink-0">
+                            <button
+                                onClick={() => {
+                                    setShowDocSelect(false);
+                                    executePendingAction(pendingAction, selectedDocId);
+                                }}
+                                className="w-full bg-estuda-primary text-white py-5 rounded-2xl font-black text-lg hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-estuda-primary/20 flex items-center justify-center gap-4 group"
+                            >
+                                <span>CONFIRMAR E GERAR AGORA</span>
+                                <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                            </button>
+                            <p className="text-center mt-4 text-[10px] font-bold text-white/20 uppercase tracking-widest">
+                                O processamento pode levar alguns segundos
+                            </p>
+                        </div>
                     </div>
                 </div>
             )}

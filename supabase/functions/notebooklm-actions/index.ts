@@ -26,7 +26,7 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    console.log('Realizando ação NotebookLM com Gemini:', action, 'Materia:', subjectId)
+    console.log('Realizando ação NotebookLM com Gemini:', action, 'Materia:', subjectId, 'Doc:', documentId || 'todos')
 
     // 1. Buscar conteúdo de estudo (chunks)
     let queryBuilder = supabase
@@ -40,57 +40,88 @@ serve(async (req: Request) => {
     }
 
     const { data: chunks, error: docError } = await queryBuilder.limit(80)
+
+    if (docError) {
+      console.error('Erro ao buscar chunks no banco:', docError.message)
+      throw new Error('Erro ao buscar material no banco de dados: ' + docError.message)
+    }
+
     const filteredChunks = chunks || []
     const contextText = filteredChunks.map((c: any) => c.content).join('\n\n')
 
+    // Regra de Ouro: Se não há contexto, não há resposta da IA baseada em material
     if (!contextText || filteredChunks.length === 0) {
-        if (action === 'summary' || action === 'guide' || action === 'citations') {
-             throw new Error('Nenhum material encontrado para processar no Gemini.')
-        }
+        return new Response(JSON.stringify({ 
+            result: "📚 Nenhum material de estudo foi encontrado para esta matéria (ou arquivo). Por favor, certifique-se de que o material foi enviado e processado corretamente para que eu possa ajudar com resumos e guias." 
+        }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
     }
 
-    let prompt = ""
-    let systemRole = "Você é um assistente de estudo inteligente, especialista em transformar materiais densos em conteúdos didáticos (estilo NotebookLM)."
+    console.log(`Contexto carregado: ${filteredChunks.length} chunks, ação: ${action}`)
 
-    const sourceInfo = documentId ? "um MATERIAL ESPECÍFICO do professor" : "TODOS os materiais disponíveis da disciplina";
+    let prompt = ""
+    let systemRole = "Você é um assistente de estudo que opera em modo ESTRITO. Você DEVE basear suas respostas ÚNICA e EXCLUSIVAMENTE no material fornecido pelo professor abaixo. É TERMINANTEMENTE PROIBIDO usar conhecimento externo ou buscar informações na internet. Se o material não contiver a informação, diga que não foi possível encontrar no material."
+
+    const sourceInfo = documentId ? "um MATERIAL ESPECÍFICO" : "os materiais da disciplina";
 
     if (action === 'summary') {
-        prompt = `TAREFA: Gere um RESUMO ESTRUTURADO PREMIUM.
-VOCÊ ESTÁ USANDO COMO BASE: ${sourceInfo}.
+        prompt = `TAREFA: Gere um RESUMO ESTRUTURADO PREMIUM baseado em ${sourceInfo}.
+        
+REGRAS:
+- Use tabelas ou tópicos para facilitar a leitura.
+- Destaque termos técnicos em negrito.
+- Mantenha a fidelidade total ao texto original.
 
 FORMATO:
-1. **Resumo Executivo**
-2. **Tópicos Essenciais**
-3. **Insights Acadêmicos**
+1. **📌 Resumo Executivo** (O que é mais importante)
+2. **🔑 Tópicos Essenciais** (Detalhes fundamentais)
+3. **💡 Insights do Material** (Conexões importantes identificadas no texto)
 
 MATERIAL PARA ANALISAR:
 """
 ${contextText}
 """`
     } else if (action === 'guide') {
-        prompt = `TAREFA: Crie um GUIA DE ESTUDO COMPACTO.
-VOCÊ ESTÁ USANDO COMO BASE: ${sourceInfo}.
+        prompt = `TAREFA: Crie um GUIA DE ESTUDO DINÂMICO baseado em ${sourceInfo}.
+
+REGRAS:
+- Transforme conceitos complexos em explicações simples (usando apenas o material).
+- Crie um roteiro de estudo baseado no que está escrito.
 
 FORMATO:
-1. **Terminologia Chave**
-2. **Desafio Rápido (3 questões)**
-3. **Dica de Especialista**
+1. **📖 Terminologia Chave** (Definições encontradas no texto)
+2. **🎯 Objetivos de Aprendizagem** (O que o aluno deve saber após ler este material)
+3. **⚠️ Pontos de Atenção** (Alertas sobre conceitos cruciais do texto)
 
 MATERIAL PARA ANALISAR:
 """
 ${contextText}
 """`
     } else if (action === 'citations') {
-        prompt = `TAREFA: Extraia 3 CITAÇÕES RELEVANTES do material abaixo.
-VOCÊ ESTÁ USANDO COMO BASE: ${sourceInfo}.
+        prompt = `TAREFA: Extraia as 3 CITAÇÕES MAIS RELEVANTES de ${sourceInfo}.
 
-MATERIAL:
+REGRAS:
+- A citação deve ser literal.
+- Explique brevemente o contexto de cada citação dentro do material.
+
+FORMATO POR CITAÇÃO:
+> "Trecho literal do material..."
+📌 **Contexto:** Explicação de onde e por que este trecho é relevante.
+
+MATERIAL PARA ANALISAR:
 """
 ${contextText}
 """`
+    } else {
+        throw new Error(`Ação inválida: "${action}". Use: summary, guide ou citations.`)
     }
 
-    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleKey}`, {
+    // MODELO: gemini-1.5-flash (estável e disponível publicamente)
+    const geminiModel = 'gemini-1.5-flash'
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${googleKey}`
+
+    const aiResponse = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -98,17 +129,19 @@ ${contextText}
             { role: "user", parts: [{ text: systemRole + "\n\n" + prompt }] }
         ],
         generationConfig: {
-          temperature: 0.7,
+          temperature: 0.3, // Menor temperatura para maior fidelidade ao texto
         }
       })
     })
 
     if (!aiResponse.ok) {
-        throw new Error('Erro na geração inteligente de conteúdo Gemini.')
+        const errBody = await aiResponse.text()
+        console.error(`Erro na API Gemini (${geminiModel}) - Status: ${aiResponse.status} - Body: ${errBody}`)
+        throw new Error(`Erro na API Gemini (status ${aiResponse.status}): ${errBody.slice(0, 300)}`)
     }
 
     const aiData = await aiResponse.json()
-    const result = aiData.candidates?.[0]?.content?.parts?.[0]?.text || 'Não foi possível elaborar o conteúdo.'
+    const result = aiData.candidates?.[0]?.content?.parts?.[0]?.text || 'Não foi possível extrair informações do material fornecido.'
 
     return new Response(JSON.stringify({ result }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -116,7 +149,7 @@ ${contextText}
   } catch (error) {
     console.error('Erro em notebooklm-actions (Gemini):', error.message)
     return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

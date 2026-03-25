@@ -53,7 +53,7 @@ serve(async (req: Request) => {
       basedOnMaterials = false
     }
 
-    // 3. Formatar o prompt para o Gemini pedindo JSON estruturado
+    // 2. Formatar o prompt para o Gemini pedindo JSON estruturado
     const sourceInfo = documentId ? "um MATERIAL ESPECÍFICO do professor" : "TODOS os materiais disponíveis da disciplina";
     
     const promptStr = `Você é um Criador de Quizzes educacionais premium para o app Estuda.AÍ.
@@ -66,18 +66,18 @@ Se o material for insuficiente, use seu conhecimento acadêmico apenas para comp
 REGRAS:
 1. Sempre 10 questões.
 2. Idioma: Português do Brasil.
-3. Cada questão deve ter 4 alternativas ("options").
-4. Apenas UMA alternativa correta ("answer").
-5. Inclua o campo "explanation" com a justificativa técnica/didática da resposta.
+3. Cada questão deve ter 4 alternativas (options): A, B, C, D como textos completos (não apenas letras).
+4. Apenas UMA alternativa correta (answer) — deve ser o TEXTO COMPLETO da alternativa correta.
+5. Inclua o campo "explanation" com a justificativa técnica/didática completa da resposta correta.
 
 O formato final DEVE obrigatoriamente ser um JSON válido contendo a raiz "questions":
 {
   "questions": [
     {
       "question": "Texto da sua pergunta?",
-      "options": ["Opção A", "Opção B", "Opção C", "Opção D"],
-      "answer": "Opção B",
-      "explanation": "Explicação detalhada baseada no material..."
+      "options": ["Texto completo da opção A", "Texto completo da opção B", "Texto completo da opção C", "Texto completo da opção D"],
+      "answer": "Texto completo da opção correta (deve ser idêntico a um dos options)",
+      "explanation": "Explicação detalhada e didática da resposta correta baseada no material..."
     }
   ]
 }
@@ -87,7 +87,11 @@ MATERIAIS DE APOIO (CONHECIMENTO RAG):
 ${contextText}
 """`
 
-    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleKey}`, {
+    // CORREÇÃO: usar gemini-1.5-flash (estável e disponível na API pública)
+    const geminiModel = 'gemini-1.5-flash'
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${googleKey}`
+
+    const aiResponse = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -100,7 +104,9 @@ ${contextText}
     })
 
     if (!aiResponse.ok) {
-        throw new Error(`Erro na API Gemini: ${await aiResponse.text()}`)
+        const errBody = await aiResponse.text()
+        console.error(`Erro na API Gemini (${geminiModel}) - Status: ${aiResponse.status} - Body: ${errBody}`)
+        throw new Error(`Erro na API Gemini (status ${aiResponse.status}): ${errBody.slice(0, 300)}`)
     }
 
     const aiData = await aiResponse.json()
@@ -110,6 +116,7 @@ ${contextText}
     try {
         parsedData = JSON.parse(jsonString)
     } catch(e) {
+        console.error('Falha ao parsear JSON do Gemini. Resposta bruta:', jsonString.slice(0, 500))
         throw new Error("Erro de formatação na resposta do Gemini (JSON fail).")
     }
 
@@ -129,7 +136,7 @@ ${contextText}
   } catch (error) {
     console.error('Erro na geração do quiz (Gemini):', error.message)
     return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
