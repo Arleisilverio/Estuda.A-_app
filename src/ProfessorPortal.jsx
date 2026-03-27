@@ -505,8 +505,9 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
     }
 
     const handleAskIA = async (customQuery = null) => {
-        const textToAsk = customQuery || query;
-        if (!textToAsk.trim() || !selectedSubject) return;
+        // Se customQuery for um texto, usamos ele. Se for objeto (evento), usamos query.
+        const textToAsk = (typeof customQuery === 'string') ? customQuery : query;
+        if (!textToAsk || !textToAsk.trim() || !selectedSubject) return;
 
         const userMessage = { role: 'user', content: textToAsk };
         setMessages(prev => [...prev, userMessage]);
@@ -1189,7 +1190,7 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                                             />
                                         </div>
                                         <button
-                                            onClick={handleAskIA}
+                                            onClick={() => handleAskIA()}
                                             disabled={isThinking || !query.trim()}
                                             className="bg-estuda-primary text-white size-12 rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shrink-0 disabled:opacity-50 disabled:grayscale"
                                         >
