@@ -720,6 +720,27 @@ function App() {
             supabase.removeChannel(channel)
         }
     }, [session])
+    
+    // Inscrição em Tempo Real para Provas
+    useEffect(() => {
+        if (!session) return
+
+        const channel = supabase
+            .channel('public:exams')
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'exams' 
+            }, () => {
+                console.log('Tabela de provas alterada em tempo real')
+                fetchExams()
+            })
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [session])
 
     const fetchCarouselImages = async () => {
         try {

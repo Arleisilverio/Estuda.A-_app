@@ -92,9 +92,9 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
             fetchDocuments()
             fetchExams()
             
-            // Se inscrever para mudanças em tempo real na tabela de documentos
-            const channel = supabase
-                .channel('documents-changes')
+            // Inscrição para Documentos
+            const docChannel = supabase
+                .channel(`documents-${selectedSubject.id}`)
                 .on('postgres_changes', { 
                     event: '*', 
                     schema: 'public', 
@@ -105,8 +105,22 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                 })
                 .subscribe()
 
+            // Inscrição para Provas
+            const examChannel = supabase
+                .channel(`exams-${selectedSubject.id}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'exams',
+                    filter: `subject=eq.${selectedSubject.name}`
+                }, () => {
+                    fetchExams()
+                })
+                .subscribe()
+
             return () => {
-                supabase.removeChannel(channel)
+                supabase.removeChannel(docChannel)
+                supabase.removeChannel(examChannel)
             }
         }
     }, [selectedSubject])
@@ -887,29 +901,24 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                                 <p className="text-[10px] text-center opacity-30 italic py-4">Nenhuma prova agendada</p>
                             ) : (
                                 exams.map(exam => (
-                                    <div key={exam.id} className="bg-estuda-bg p-4 rounded-2xl border border-white/5 relative group">
-                                        <div className="flex items-start gap-3">
-                                            <div className="size-10 rounded-xl bg-estuda-primary/10 flex flex-col items-center justify-center text-estuda-primary shrink-0 border border-estuda-primary/10">
-                                                <span className="text-[8px] font-black uppercase leading-none">{new Date(exam.date + 'T00:00:00').toLocaleDateString('pt-BR', { month: 'short' })}</span>
-                                                <span className="text-sm font-black leading-none">{exam.date.split('-')[2]}</span>
+                                    <div key={exam.id} className="bg-estuda-bg p-4 rounded-2xl border border-white/5 flex items-center justify-between group animate-fade-in">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className="size-8 rounded-lg bg-estuda-primary/10 flex items-center justify-center text-estuda-primary shrink-0 border border-estuda-primary/10">
+                                                <FileQuestion size={14} />
                                             </div>
-                                            <div className="overflow-hidden">
-                                                <h4 className="text-[11px] font-black leading-tight truncate">{exam.title}</h4>
-                                                <span className="text-[9px] font-bold opacity-40 uppercase tracking-tighter flex items-center gap-1.5 mt-0.5">
-                                                    <Clock size={8} /> {exam.time.substring(0, 5)}
-                                                </span>
-                                            </div>
+                                            <h4 className="text-[11px] font-black leading-tight truncate text-white/80">{exam.title}</h4>
                                         </div>
                                         <button 
                                             onClick={async () => {
-                                                if (window.confirm('Excluir este agendamento?')) {
+                                                if (window.confirm('Excluir este agendamento? Ele será removido do portal do aluno imediatamente.')) {
                                                     const { error } = await supabase.from('exams').delete().eq('id', exam.id)
                                                     if (!error) fetchExams()
                                                 }
                                             }}
-                                            className="absolute top-2 right-2 p-1.5 text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/10 rounded-lg"
+                                            className="p-2 text-red-400 opacity-40 group-hover:opacity-100 transition-all hover:bg-red-500/10 rounded-xl"
+                                            title="Excluir agendamento"
                                         >
-                                            <Trash2 size={12} />
+                                            <Trash2 size={14} />
                                         </button>
                                     </div>
                                 ))
