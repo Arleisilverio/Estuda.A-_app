@@ -893,38 +893,6 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                         </div>
                     </div>
 
-                    {/* Provas Agendadas */}
-                    <div className="bg-estuda-surface border border-estuda-primary/10 rounded-[2.5rem] p-6 shadow-lg">
-                        <h3 className="text-sm font-black uppercase tracking-widest opacity-50 mb-4 pl-1">Provas Agendadas</h3>
-                        <div className="flex flex-col gap-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                            {exams.length === 0 ? (
-                                <p className="text-[10px] text-center opacity-30 italic py-4">Nenhuma prova agendada</p>
-                            ) : (
-                                exams.map(exam => (
-                                    <div key={exam.id} className="bg-estuda-bg p-4 rounded-2xl border border-white/5 flex items-center justify-between group animate-fade-in">
-                                        <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className="size-8 rounded-lg bg-estuda-primary/10 flex items-center justify-center text-estuda-primary shrink-0 border border-estuda-primary/10">
-                                                <FileQuestion size={14} />
-                                            </div>
-                                            <h4 className="text-[11px] font-black leading-tight truncate text-white/80">{exam.title}</h4>
-                                        </div>
-                                        <button 
-                                            onClick={async () => {
-                                                if (window.confirm('Excluir este agendamento? Ele será removido do portal do aluno imediatamente.')) {
-                                                    const { error } = await supabase.from('exams').delete().eq('id', exam.id)
-                                                    if (!error) fetchExams()
-                                                }
-                                            }}
-                                            className="p-2 text-red-400 opacity-40 group-hover:opacity-100 transition-all hover:bg-red-500/10 rounded-xl"
-                                            title="Excluir agendamento"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
                 </div>
 
 
@@ -1121,6 +1089,44 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
                         ) : (
                             /* Área de Mensagens do Chat — idêntica ao aluno */
                             <div className="flex-1 flex flex-col overflow-hidden">
+                                {/* Seção de Provas Agendadas — Visível no topo do chat para lembrete */}
+                                <div className="px-6 py-4 border-b border-estuda-primary/10 bg-estuda-bg/10 backdrop-blur-sm shrink-0">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <Calendar size={14} className="text-estuda-primary" />
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-white/40">Provas Agendadas</h4>
+                                        </div>
+                                        <span className="text-[9px] font-black text-estuda-primary/40 uppercase tracking-widest bg-estuda-primary/5 px-2 py-0.5 rounded-full">
+                                            {exams.length} {exams.length === 1 ? 'PROVA' : 'PROVAS'}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {exams.length === 0 ? (
+                                            <p className="text-[10px] text-white/20 italic font-medium px-2 py-1 underline decoration-estuda-primary/20 underline-offset-4">
+                                                Nenhuma prova agendada para {selectedSubject?.name}
+                                            </p>
+                                        ) : (
+                                            exams.map(exam => (
+                                                <div key={exam.id} className="flex items-center gap-2 bg-estuda-bg/40 border border-white/5 rounded-xl px-3 py-1.5 group hover:border-estuda-primary/30 transition-all animate-fade-in shadow-inner">
+                                                    <span className="text-[10px] font-bold text-white/80 max-w-[150px] truncate">{exam.title}</span>
+                                                    <button 
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            if (window.confirm('Excluir este agendamento?')) {
+                                                                const { error } = await supabase.from('exams').delete().eq('id', exam.id)
+                                                                if (!error) fetchExams()
+                                                            }
+                                                        }}
+                                                        className="text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:scale-110 p-0.5"
+                                                        title="Excluir"
+                                                    >
+                                                        <Trash2 size={10} />
+                                                    </button>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
                                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-4 custom-scrollbar bg-estuda-bg/5">
                                     {messages.length === 0 ? (
                                         <div className="flex-1 flex flex-col items-center justify-center text-center p-8 opacity-20">
