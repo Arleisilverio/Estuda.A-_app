@@ -250,7 +250,6 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
     const executePendingAction = async (action, docId) => {
         if (!selectedSubject) return
         
-        setLoading(true)
         setIsThinking(true)
         
         try {
@@ -285,7 +284,6 @@ export default function ProfessorPortal({ session, onLogout, isAdmin, setViewing
             console.error('Erro na ação de IA:', err)
             alert('Não foi possível completar a ação. Verifique se o material foi processado.')
         } finally {
-            setLoading(false)
             setIsThinking(false)
         }
     }

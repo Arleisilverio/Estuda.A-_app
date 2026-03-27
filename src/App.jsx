@@ -662,7 +662,7 @@ function App() {
         try {
             const { data, error } = await supabase
                 .from('subjects')
-                .select('*')
+                .select('*, professors(name)')
                 .order('name')
             if (error) throw error
             if (data) setSubjects(data.map(s => ({ 
@@ -670,7 +670,8 @@ function App() {
                 name: s.name, 
                 icon: s.icon_name,
                 professor_notes: s.professor_notes,
-                notes_updated_at: s.notes_updated_at
+                notes_updated_at: s.notes_updated_at,
+                professor_name: s.professors?.[0]?.name // Pega o nome do primeiro professor vinculado
             })))
         } catch (e) {
             console.error('Erro ao buscar matérias:', e)
@@ -1259,16 +1260,49 @@ Pergunta do Aluno: ${query}`;
         return <ProfessorPortal session={session} onLogout={() => supabase.auth.signOut()} isAdmin={isAdmin} setViewingProfessorPortal={setViewingProfessorPortal} />
     }
 
-    // Calcula anotações ativas
-    const activeNotifications = subjects.filter(s => 
-        s.professor_notes && 
-        s.notes_updated_at && 
-        !readNotifications.includes(`${s.id}_${s.notes_updated_at}`)
-    )
+    // Calcula notificações de notas de professores
+    const notesNotifications = subjects
+        .filter(s => s.professor_notes && s.notes_updated_at && !readNotifications.includes(`note_${s.id}_${s.notes_updated_at}`))
+        .map(s => ({
+            id: `note_${s.id}_${s.notes_updated_at}`,
+            type: 'note',
+            title: s.name,
+            message: s.professor_notes,
+            professor: s.professor_name || 'Professor(a)',
+            date: s.notes_updated_at,
+            icon: s.icon,
+            original_id: s.id,
+            original_updated_at: s.notes_updated_at
+        }));
 
-    const dismissNotification = (id, updatedAt) => {
-        const key = `${id}_${updatedAt}`
-        const updated = [...readNotifications, key]
+    // Calcula notificações de provas (2 dias de antecedência)
+    const examNotifications = exams
+        .filter(exam => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const examDate = new Date(exam.date + 'T00:00:00');
+            const diffTime = examDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            // Requisito: 2 dias de antecedência
+            const isNear = diffDays >= 0 && diffDays <= 2;
+            return isNear && !readNotifications.includes(`exam_${exam.id}`);
+        })
+        .map(exam => ({
+            id: `exam_${exam.id}`,
+            type: 'exam',
+            title: `Lembrete de Prova: ${exam.title}`,
+            message: `Sua prova de ${exam.subject} está agendada para ${new Date(exam.date + 'T00:00:00').toLocaleDateString('pt-BR')} às ${exam.time.substring(0, 5)}. Conteúdo: ${exam.subtitle || 'Não informado'}`,
+            date: exam.date,
+            icon: '📝',
+            original_id: exam.id
+        }));
+
+    // Unifica e ordena (mais recentes no topo)
+    const activeNotifications = [...notesNotifications, ...examNotifications].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const dismissNotification = (id) => {
+        const updated = [...readNotifications, id]
         setReadNotifications(updated)
         localStorage.setItem('estuda_read_notifications', JSON.stringify(updated))
         
@@ -1317,28 +1351,30 @@ Pergunta do Aluno: ${query}`;
                                             <p className="text-xs font-semibold">Tudo lido por enquanto!</p>
                                         </div>
                                     ) : (
-                                        activeNotifications.map(subj => {
-                                            const date = new Date(subj.notes_updated_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-                                            const time = new Date(subj.notes_updated_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                                        activeNotifications.map(notif => {
+                                            const isExam = notif.type === 'exam'
+                                            const date = new Date(notif.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+                                            const time = notif.type === 'note' ? new Date(notif.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
                                             
                                             return (
-                                                <div key={`${subj.id}_${subj.notes_updated_at}`} className="bg-estuda-surface border border-estuda-primary/10 rounded-2xl p-4 relative group hover:border-estuda-primary/30 transition-all">
+                                                <div key={notif.id} className={`border rounded-2xl p-4 relative group transition-all bg-estuda-surface ${isExam ? 'border-yellow-500/20 hover:border-yellow-500/40' : 'border-estuda-primary/10 hover:border-estuda-primary/30'}`}>
                                                     <div className="flex gap-3 relative z-10">
-                                                        <div className="size-10 rounded-xl bg-estuda-primary/10 flex items-center justify-center text-xl shrink-0">
-                                                            {subj.icon}
+                                                        <div className={`size-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${isExam ? 'bg-yellow-500/10' : 'bg-estuda-primary/10'}`}>
+                                                            {notif.icon}
                                                         </div>
                                                         <div className="flex-1">
                                                             <div className="flex items-start justify-between">
-                                                                <h4 className="text-xs font-bold text-white mb-0.5 pr-6 leading-tight">{subj.name}</h4>
+                                                                <h4 className="text-xs font-bold text-white mb-0.5 pr-6 leading-tight">{notif.title}</h4>
                                                             </div>
-                                                            <span className="text-[9px] font-bold text-estuda-primary/80 uppercase tracking-widest block mb-2">{date} às {time}</span>
-                                                            <p className="text-xs text-white/70 whitespace-pre-wrap leading-snug">{subj.professor_notes}</p>
+                                                            {notif.type === 'note' && <span className="text-[10px] font-black text-estuda-primary uppercase tracking-tighter mb-1 block">Prof: {notif.professor}</span>}
+                                                            <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest block mb-2">{date} {time && `às ${time}`}</span>
+                                                            <p className="text-xs text-white/70 whitespace-pre-wrap leading-snug">{notif.message}</p>
                                                         </div>
                                                     </div>
                                                     
                                                     {/* Botão de Excluir */}
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); dismissNotification(subj.id, subj.notes_updated_at); }}
+                                                        onClick={(e) => { e.stopPropagation(); dismissNotification(notif.id); }}
                                                         className="absolute top-2 right-2 size-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-20"
                                                         title="Apagar para mim"
                                                     >
