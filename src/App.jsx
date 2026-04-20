@@ -1023,8 +1023,8 @@ Pergunta do Aluno: ${query}`;
 
                 if (checkError) throw checkError;
 
-                if (count && count > 0) {
-                    alert(`Você já realizou o quiz de "${selectedSubject.name}" hoje. \n\nPara otimizar seu aprendizado e evitar sobrecarga, permitimos apenas um quiz por matéria por dia. Volte amanhã para um novo desafio!`);
+                if (count && count >= 3) {
+                    alert(`Você já realizou o limite de 3 quizzes de "${selectedSubject.name}" hoje. \n\nPara otimizar seu aprendizado e evitar sobrecarga, permitimos até três quizzes por matéria por dia. Volte amanhã para um novo desafio!`);
                     return;
                 }
             } catch (err) {
