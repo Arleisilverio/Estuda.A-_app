@@ -167,9 +167,9 @@ function App() {
     // const [showPerfilForm, setShowPerfilForm] = useState(false) // Removido: integrado na página
     const [perfilDraft, setPerfilDraft] = useState({ nome: '', turma: '', turno: '', curso: '', periodo: '', avatar: null })
 
-    // Estado da Grade
     const [schedule, setSchedule] = useState([])
     const [showScheduleForm, setShowScheduleForm] = useState(false)
+    const [editingScheduleId, setEditingScheduleId] = useState(null)
     const [newScheduleItem, setNewScheduleItem] = useState({ day_of_week: 'SEG', start_time: '08:00', end_time: '09:00', subject_name: '', prof: '', color: '#4A90E2' })
 
     // Estado do Histórico de Quizzes
@@ -758,9 +758,13 @@ function App() {
 
     const fetchSchedule = async () => {
         try {
+            const { data: { session: currentSession } } = await supabase.auth.getSession()
+            if (!currentSession) return
+
             const { data, error } = await supabase
                 .from('schedule')
                 .select('*')
+                .eq('user_id', currentSession.user.id)
                 .order('start_time')
             if (error) throw error
             setSchedule(data || [])
@@ -844,6 +848,48 @@ function App() {
         } catch (err) {
             console.error('Erro ao adicionar prova:', err)
             alert('Erro ao salvar prova: ' + err.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleSaveScheduleItem = async (e) => {
+        e.preventDefault()
+        setLoading(true)
+        try {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) { alert('Você precisa estar logado.'); return }
+
+            const payload = {
+                user_id: session.user.id,
+                day_of_week: newScheduleItem.day_of_week,
+                start_time: newScheduleItem.start_time,
+                end_time: newScheduleItem.end_time,
+                subject_name: newScheduleItem.subject_name,
+                room: newScheduleItem.prof, // Mapeado para 'room' no banco
+                color: newScheduleItem.color
+            }
+
+            if (editingScheduleId) {
+                const { error } = await supabase
+                    .from('schedule')
+                    .update(payload)
+                    .eq('id', editingScheduleId)
+                if (error) throw error
+            } else {
+                const { error } = await supabase
+                    .from('schedule')
+                    .insert([payload])
+                if (error) throw error
+            }
+            
+            setShowScheduleForm(false)
+            setEditingScheduleId(null)
+            setNewScheduleItem({ day_of_week: 'SEG', start_time: '08:00', end_time: '09:00', subject_name: '', prof: '', color: '#4A90E2' })
+            fetchSchedule()
+        } catch (err) {
+            console.error('Erro ao salvar aula:', err)
+            alert('Erro ao salvar aula: ' + err.message)
         } finally {
             setLoading(false)
         }
@@ -2017,16 +2063,14 @@ Pergunta do Aluno: ${query}`;
                                         <span className="text-estuda-primary font-black uppercase" style={{ fontSize: 10, letterSpacing: '0.12em' }}>{perfil.turma || 'Turmas Normais'}</span>
                                     </div>
                                     <h2 className="text-2xl font-black">Grade Semanal</h2>
-                                    <p className="opacity-50 font-semibold mt-1" style={{ fontSize: 10 }}>{perfil.turno || 'MANHÃ'} · {perfil.curso || 'DIREITO'} · arraste para o lado →</p>
+                                    <p className="opacity-50 font-semibold mt-1" style={{ fontSize: 10 }}>{perfil.turno || 'MANHÃ'} · {perfil.curso || 'DIREITO'}</p>
                                 </div>
-                                {isAdmin && (
-                                    <button
-                                        onClick={() => setShowScheduleForm(true)}
-                                        className="bg-estuda-primary text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg"
-                                    >
-                                        <Plus size={20} /> Adicionar Aula
-                                    </button>
-                                )}
+                                <button
+                                    onClick={() => setShowScheduleForm(true)}
+                                    className="bg-estuda-primary text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg"
+                                >
+                                    <Plus size={20} /> Adicionar Aula
+                                </button>
                             </div>
 
                             {schedule.length === 0 ? (
@@ -2044,40 +2088,64 @@ Pergunta do Aluno: ${query}`;
                                                     <p style={{ fontWeight: 900, fontSize: 14, color: 'white', margin: 0 }}>{day}</p>
                                                     <p style={{ fontWeight: 700, fontSize: 10, opacity: 0.4, margin: 0 }}>{dayLabels[day]}</p>
                                                 </div>
-                                                <div className="flex flex-col gap-2">
-                                                    {schedule.filter(s => s.day_of_week === day).map((item) => (
-                                                        <div
-                                                            key={item.id}
-                                                            style={{
-                                                                borderRadius: 16,
-                                                                background: (item.color || '#4A90E2') + '15',
-                                                                border: '1px solid ' + (item.color || '#4A90E2') + '30',
-                                                                padding: '12px',
-                                                                position: 'relative'
-                                                            }}
-                                                            className="group transition-all hover:bg-white/5"
-                                                        >
-                                                            <div className="flex items-center gap-2 mb-2">
-                                                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: item.color || '#4A90E2' }}></span>
-                                                                <span style={{ fontSize: 9, fontWeight: 900, color: item.color || '#4A90E2' }}>{item.start_time.substring(0, 5)} - {item.end_time.substring(0, 5)}</span>
-                                                            </div>
-                                                            <p style={{ fontWeight: 900, fontSize: 12, lineHeight: 1.3, color: '#fff', margin: 0 }}>{item.subject_name}</p>
-                                                            {item.room && <p style={{ fontWeight: 700, fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{item.room}</p>}
+                                                            <div className="flex flex-col gap-2">
+                                                                {schedule.filter(s => s.day_of_week === day).map((item) => (
+                                                                    <div
+                                                                        key={item.id}
+                                                                        style={{
+                                                                            borderRadius: 20,
+                                                                            background: (item.color || '#4A90E2') + '15',
+                                                                            border: '1px solid ' + (item.color || '#4A90E2') + '30',
+                                                                            padding: '14px',
+                                                                            position: 'relative'
+                                                                        }}
+                                                                        className="group transition-all hover:bg-white/5 shadow-sm hover:shadow-md"
+                                                                    >
+                                                                        <div className="flex items-center gap-2 mb-2">
+                                                                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: item.color || '#4A90E2' }} className="shadow-[0_0_8px_currentColor] animate-pulse"></span>
+                                                                            <span style={{ fontSize: 9, fontWeight: 900, color: item.color || '#4A90E2' }} className="tracking-widest uppercase">{item.start_time.substring(0, 5)} - {item.end_time.substring(0, 5)}</span>
+                                                                        </div>
+                                                                        <p style={{ fontWeight: 900, fontSize: 13, lineHeight: 1.3, color: '#fff', margin: 0 }}>{item.subject_name}</p>
+                                                                        {item.room && (
+                                                                            <div className="flex items-center gap-1.5 mt-2 opacity-50">
+                                                                                <User size={10} className="text-white" />
+                                                                                <p style={{ fontWeight: 700, fontSize: 9, color: '#fff', margin: 0 }} className="truncate max-w-[120px]">{item.room}</p>
+                                                                            </div>
+                                                                        )}
 
-                                                            {isAdmin && (
-                                                                <button
-                                                                    onClick={async () => {
-                                                                        const { error } = await supabase.from('schedule').delete().eq('id', item.id);
-                                                                        if (!error) fetchSchedule();
-                                                                    }}
-                                                                    className="absolute top-2 right-2 p-1 text-red-500/30 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                                                                >
-                                                                    <Trash2 size={10} />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                                                        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setNewScheduleItem({
+                                                                                        day_of_week: item.day_of_week,
+                                                                                        start_time: item.start_time,
+                                                                                        end_time: item.end_time,
+                                                                                        subject_name: item.subject_name,
+                                                                                        prof: item.room || '',
+                                                                                        color: item.color || '#4A90E2'
+                                                                                    })
+                                                                                    setEditingScheduleId(item.id)
+                                                                                    setShowScheduleForm(true)
+                                                                                }}
+                                                                                className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white/50 hover:text-white transition-all"
+                                                                            >
+                                                                                <Settings size={10} />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={async () => {
+                                                                                    if (confirm('Deseja excluir esta aula?')) {
+                                                                                        const { error } = await supabase.from('schedule').delete().eq('id', item.id);
+                                                                                        if (!error) fetchSchedule();
+                                                                                    }
+                                                                                }}
+                                                                                className="p-1.5 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-500/50 hover:text-red-500 transition-all"
+                                                                            >
+                                                                                <Trash2 size={10} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                             </div>
                                         ))}
                                     </div>
@@ -2605,6 +2673,132 @@ Pergunta do Aluno: ${query}`;
                             >
                                 {loading ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
                                 Agendar Prova
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            {/* Modal Adicionar Aula (Grade Horária) */}
+            {showScheduleForm && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => { setShowScheduleForm(false); setEditingScheduleId(null); setNewScheduleItem({ day_of_week: 'SEG', start_time: '08:00', end_time: '09:00', subject_name: '', prof: '', color: '#4A90E2' }); }}></div>
+                    <div className="bg-estuda-surface border border-estuda-primary/20 p-6 sm:p-8 rounded-[2.5rem] shadow-2xl w-full max-w-md relative z-10 animate-fade-in flex flex-col overflow-y-auto" style={{ maxHeight: '90vh' }}>
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
+                                <Calendar size={24} className="text-estuda-primary" /> {editingScheduleId ? 'Editar Aula' : 'Nova Aula'}
+                            </h3>
+                            <button type="button" onClick={() => { setShowScheduleForm(false); setEditingScheduleId(null); setNewScheduleItem({ day_of_week: 'SEG', start_time: '08:00', end_time: '09:00', subject_name: '', prof: '', color: '#4A90E2' }); }} className="p-2 rounded-xl hover:bg-white/5 opacity-50 hover:opacity-100 transition-all font-bold text-sm text-white">✕</button>
+                        </div>
+
+                        <form onSubmit={handleSaveScheduleItem} className="flex flex-col gap-4">
+                            {/* Nome da Matéria */}
+                            <div>
+                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Nome da Matéria *</label>
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-estuda-primary transition-colors">
+                                        <BookOpen size={18} />
+                                    </div>
+                                    <input
+                                        required
+                                        type="text"
+                                        placeholder="Ex: Direito Civil III"
+                                        value={newScheduleItem.subject_name}
+                                        onChange={e => setNewScheduleItem({ ...newScheduleItem, subject_name: e.target.value })}
+                                        className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors placeholder:text-white/20 text-white"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Professor/Sala */}
+                            <div>
+                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Professor / Sala (Opcional)</label>
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-estuda-primary transition-colors">
+                                        <User size={18} />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="Ex: Prof. Arlei - Sala 202"
+                                        value={newScheduleItem.prof}
+                                        onChange={e => setNewScheduleItem({ ...newScheduleItem, prof: e.target.value })}
+                                        className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors placeholder:text-white/20 text-white"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Dia da Semana */}
+                            <div>
+                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Dia da Semana *</label>
+                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                                    {['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map(day => (
+                                        <button
+                                            key={day}
+                                            type="button"
+                                            onClick={() => setNewScheduleItem({ ...newScheduleItem, day_of_week: day })}
+                                            className={`py-2 rounded-xl text-[10px] font-black transition-all border ${newScheduleItem.day_of_week === day ? 'bg-estuda-primary border-estuda-primary text-white shadow-lg' : 'bg-estuda-bg border-white/5 text-white/40 hover:bg-white/5'}`}
+                                        >
+                                            {day}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Horários */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Início *</label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-estuda-primary transition-colors pointer-events-none text-xs">
+                                            <Clock size={16} />
+                                        </div>
+                                        <input
+                                            required
+                                            type="time"
+                                            value={newScheduleItem.start_time}
+                                            onChange={e => setNewScheduleItem({ ...newScheduleItem, start_time: e.target.value })}
+                                            className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl pl-10 pr-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors text-white [color-scheme:dark]"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Fim *</label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-estuda-primary transition-colors pointer-events-none text-xs">
+                                            <Clock size={16} />
+                                        </div>
+                                        <input
+                                            required
+                                            type="time"
+                                            value={newScheduleItem.end_time}
+                                            onChange={e => setNewScheduleItem({ ...newScheduleItem, end_time: e.target.value })}
+                                            className="w-full bg-estuda-bg border border-estuda-primary/10 rounded-2xl pl-10 pr-4 py-3 text-sm font-bold focus:outline-none focus:border-estuda-primary/50 transition-colors text-white [color-scheme:dark]"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Cores */}
+                            <div>
+                                <label className="block text-[10px] font-black uppercase tracking-widest opacity-50 mb-1.5 pl-1">Cor da Aula</label>
+                                <div className="flex flex-wrap gap-3 p-3 bg-estuda-bg/50 rounded-2xl border border-white/5">
+                                    {['#4A90E2', '#E24A4A', '#4AE24A', '#E2E24A', '#E24AE2', '#4AE2E2'].map(color => (
+                                        <button
+                                            key={color}
+                                            type="button"
+                                            onClick={() => setNewScheduleItem({ ...newScheduleItem, color: color })}
+                                            className={`size-8 rounded-full transition-all border-2 ${newScheduleItem.color === color ? 'border-white scale-125 shadow-lg' : 'border-transparent opacity-60 hover:opacity-100 hover:scale-110'}`}
+                                            style={{ backgroundColor: color }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
+                            <button
+                                disabled={loading}
+                                type="submit"
+                                className="w-full bg-estuda-primary text-white py-4 rounded-2xl font-black text-sm mt-4 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-estuda-primary/20 disabled:opacity-50"
+                            >
+                                {loading ? <Loader2 size={18} className="animate-spin" /> : (editingScheduleId ? <Check size={18} /> : <Plus size={18} />)}
+                                {editingScheduleId ? 'Atualizar Aula' : 'Salvar Aula na Grade'}
                             </button>
                         </form>
                     </div>

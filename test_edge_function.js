@@ -27,17 +27,19 @@ async function test() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ documentId: 'test' })
+        body: JSON.stringify({ documentId: 'a3a4d6c2-c83c-4e6d-87c2-563931db37e1' })
     })
 
     console.log('Test 1 Fetch status:', res.status)
     if (res.status !== 200) {
         console.log('Test 1 Error:', await res.text())
+    } else {
+        console.log('Test 1 Success:', await res.json())
     }
 
     // Test 2: invoke
     const { data, error } = await supabase.functions.invoke('process-document', {
-        body: { documentId: 'test2' }
+        body: { documentId: 'a3a4d6c2-c83c-4e6d-87c2-563931db37e1' }
     })
 
     console.log('Test 2 Invoke error:', error?.context || error)
